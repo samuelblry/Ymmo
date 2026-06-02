@@ -1,0 +1,26 @@
+# Env & secrets
+.env
+.env.*
+
+# Frontend
+node_modules/
+dist/
+.vite/
+
+# Backend
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
