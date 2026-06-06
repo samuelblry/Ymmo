@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Reveal, Stagger, StaggerItem } from '../components/ui/Reveal'
 import { agencies } from '../data/agencies'
+import { apiFetch } from '../lib/api'
 
 const hq = agencies.find((a) => a.isHQ)
 
@@ -67,14 +68,38 @@ const infos = [
 ]
 
 export default function Contact() {
-  const [form, setForm] = useState({ sujet: '', nom: '', email: '', message: '' })
+  const [form, setForm] = useState({ sujet: '', nom: '', email: '', telephone: '', message: '' })
   const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    setSent(true)
+    setError('')
+    setLoading(true)
+    const [prenom, ...nomParts] = form.nom.trim().split(/\s+/)
+    try {
+      await apiFetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id_agence_dest: hq.id,
+          prenom,
+          nom: nomParts.join(' ') || prenom,
+          email: form.email,
+          telephone: form.telephone || null,
+          sujet: form.sujet,
+          contenu: form.message,
+        }),
+      })
+      setSent(true)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -123,7 +148,13 @@ export default function Contact() {
                   <h2 className="text-2xl font-bold text-noir">Envoyer un message</h2>
                   <p className="mt-1 text-sm text-gris-fonce">Tous les champs sont obligatoires.</p>
 
-                  <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+                    <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+                    {error && (
+                      <p className="rounded-xl border border-marron/30 bg-marron-clair px-4 py-3 text-sm text-marron-fonce">
+                        {error}
+                      </p>
+                    )}
+
                     <div>
                       <label htmlFor="sujet" className="block text-sm font-medium text-noir">
                         Sujet
@@ -177,6 +208,21 @@ export default function Contact() {
                     </div>
 
                     <div>
+                      <label htmlFor="telephone" className="block text-sm font-medium text-noir">
+                        Téléphone
+                      </label>
+                      <input
+                        id="telephone"
+                        name="telephone"
+                        type="tel"
+                        value={form.telephone}
+                        onChange={handleChange}
+                        placeholder="06 00 00 00 00"
+                        className="mt-2 w-full rounded-xl border border-gris-moyen bg-gris-clair px-4 py-3 text-sm text-noir placeholder:text-gris-fonce/60 focus:border-marron focus:outline-none focus:ring-2 focus:ring-marron/20"
+                      />
+                    </div>
+
+                    <div>
                       <label htmlFor="message" className="block text-sm font-medium text-noir">
                         Message
                       </label>
@@ -194,9 +240,10 @@ export default function Contact() {
 
                     <button
                       type="submit"
+                      disabled={loading}
                       className="w-full rounded-full bg-marron py-3 text-sm font-semibold text-blanc transition-opacity hover:opacity-90"
                     >
-                      Envoyer le message
+                      {loading ? 'Envoi...' : 'Envoyer le message'}
                     </button>
                   </form>
                 </>

@@ -11,15 +11,29 @@ export default function Register() {
     password: '',
     confirm: '',
   })
-  const { login } = useAuth()
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const { register } = useAuth()
   const navigate = useNavigate()
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    login({ firstName: form.firstName, lastName: form.lastName, email: form.email })
-    navigate('/compte', { replace: true })
+    setError('')
+    if (form.password !== form.confirm) {
+      setError('Les mots de passe ne correspondent pas')
+      return
+    }
+    setLoading(true)
+    try {
+      await register(form)
+      navigate('/compte', { replace: true })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -37,6 +51,12 @@ export default function Register() {
             </p>
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+              {error && (
+                <p className="rounded-xl border border-marron/30 bg-marron-clair px-4 py-3 text-sm text-marron-fonce">
+                  {error}
+                </p>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="firstName" className="block text-sm font-medium text-noir">
@@ -125,9 +145,10 @@ export default function Register() {
 
               <button
                 type="submit"
+                disabled={loading}
                 className="mt-2 w-full rounded-full bg-marron py-3 text-sm font-semibold text-blanc transition-opacity hover:opacity-90"
               >
-                Créer mon compte
+                {loading ? 'Creation...' : 'Créer mon compte'}
               </button>
             </form>
 

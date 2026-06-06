@@ -36,17 +36,17 @@ export default function App() {
             <Route path="/annonces/:id" element={<AnnonceDetail />} />
             <Route path="/agences" element={<Agences />} />
             <Route path="/agences/:id" element={<AgenceDetail />} />
-<Route path="/contact" element={<Contact />} />
+            <Route path="/contact" element={<Contact />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:id" element={<BlogArticle />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/compte" element={<ProtectedRoute><Compte /></ProtectedRoute>} />
-            <Route path="/dashboard/commercial" element={<ProtectedRoute><DashboardCommercial /></ProtectedRoute>} />
-            <Route path="/dashboard/marketing"  element={<ProtectedRoute><DashboardMarketing /></ProtectedRoute>} />
-            <Route path="/dashboard/rh"         element={<ProtectedRoute><DashboardRH /></ProtectedRoute>} />
-            <Route path="/dashboard/direction"  element={<ProtectedRoute><DashboardDirection /></ProtectedRoute>} />
-            <Route path="/dashboard/it"         element={<ProtectedRoute><DashboardIT /></ProtectedRoute>} />
+            <Route path="/dashboard/commercial" element={<ProtectedRoute roles={['Commercial']}><DashboardCommercial /></ProtectedRoute>} />
+            <Route path="/dashboard/marketing"  element={<ProtectedRoute roles={['Marketing']}><DashboardMarketing /></ProtectedRoute>} />
+            <Route path="/dashboard/rh"         element={<ProtectedRoute roles={['RH_Juridique']}><DashboardRH /></ProtectedRoute>} />
+            <Route path="/dashboard/direction"  element={<ProtectedRoute roles={['Direction']}><DashboardDirection /></ProtectedRoute>} />
+            <Route path="/dashboard/it"         element={<ProtectedRoute roles={['IT_Support']}><DashboardIT /></ProtectedRoute>} />
             <Route path="/mentions-legales" element={<MentionsLegales />} />
             <Route path="/cgu" element={<CGU />} />
             <Route path="/politique-confidentialite" element={<PolitiqueConfidentialite />} />

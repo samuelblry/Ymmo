@@ -16,6 +16,9 @@ venv/
 env/
 *.egg-info/
 .pytest_cache/
+ymmo_dev.db
+backend/*.db
+uploads/
 
 # OS
 .DS_Store

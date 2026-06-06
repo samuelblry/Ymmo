@@ -5,17 +5,38 @@ import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' })
+  const [mfa, setMfa] = useState({ required: false, tempToken: '', code: '' })
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
+  const handleMfaChange = (e) => setMfa({ ...mfa, code: e.target.value })
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    login({ firstName: 'Jean', lastName: 'Dupont', email: form.email })
-    const from = location.state?.from?.pathname ?? '/compte'
-    navigate(from, { replace: true })
+    setError('')
+    setLoading(true)
+    try {
+      const result = await login({
+        email: form.email,
+        password: form.password,
+        mfaCode: mfa.code,
+        tempToken: mfa.tempToken,
+      })
+      if (result.require_mfa) {
+        setMfa({ required: true, tempToken: result.temp_token, code: '' })
+        return
+      }
+      const from = location.state?.from?.pathname ?? result.user.dashboardPath
+      navigate(from, { replace: true })
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -52,7 +73,14 @@ export default function Login() {
             </p>
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-              <div>
+              {error && (
+                <p className="rounded-xl border border-marron/30 bg-marron-clair px-4 py-3 text-sm text-marron-fonce">
+                  {error}
+                </p>
+              )}
+
+              {!mfa.required && (
+                <div>
                 <label htmlFor="email" className="block text-sm font-medium text-noir">
                   Adresse e-mail
                 </label>
@@ -68,8 +96,10 @@ export default function Login() {
                   className="mt-2 w-full rounded-xl border border-gris-moyen bg-gris-clair px-4 py-3 text-sm text-noir placeholder:text-gris-fonce/60 focus:border-marron focus:outline-none focus:ring-2 focus:ring-marron/20"
                 />
               </div>
+              )}
 
-              <div>
+              {!mfa.required && (
+                <div>
                 <div className="flex items-center justify-between">
                   <label htmlFor="password" className="block text-sm font-medium text-noir">
                     Mot de passe
@@ -90,12 +120,35 @@ export default function Login() {
                   className="mt-2 w-full rounded-xl border border-gris-moyen bg-gris-clair px-4 py-3 text-sm text-noir placeholder:text-gris-fonce/60 focus:border-marron focus:outline-none focus:ring-2 focus:ring-marron/20"
                 />
               </div>
+              )}
+
+              {mfa.required && (
+                <div>
+                  <label htmlFor="mfaCode" className="block text-sm font-medium text-noir">
+                    Code MFA
+                  </label>
+                  <input
+                    id="mfaCode"
+                    name="mfaCode"
+                    type="text"
+                    inputMode="numeric"
+                    required
+                    minLength={6}
+                    maxLength={6}
+                    value={mfa.code}
+                    onChange={handleMfaChange}
+                    placeholder="123456"
+                    className="mt-2 w-full rounded-xl border border-gris-moyen bg-gris-clair px-4 py-3 text-sm text-noir placeholder:text-gris-fonce/60 focus:border-marron focus:outline-none focus:ring-2 focus:ring-marron/20"
+                  />
+                </div>
+              )}
 
               <button
                 type="submit"
+                disabled={loading}
                 className="mt-2 w-full rounded-full bg-marron py-3 text-sm font-semibold text-blanc transition-opacity hover:opacity-90"
               >
-                Se connecter
+                {loading ? 'Connexion...' : 'Se connecter'}
               </button>
             </form>
 
