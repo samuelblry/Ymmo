@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { agencies, regions } from '../data/agencies'
+import { apiFetch } from '../lib/api'
+import { mapAgency } from '../lib/dataMappers'
 import { SearchIcon } from '../components/ui/icons'
 
 function PhoneIcon(props) {
@@ -73,9 +75,28 @@ function AgencyCard({ agency }) {
 export default function Agences() {
   const [region, setRegion] = useState('Toutes')
   const [query, setQuery] = useState('')
+  const [items, setItems] = useState(agencies)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let ignore = false
+    apiFetch('/api/agences')
+      .then((data) => {
+        if (!ignore) setItems(data.map(mapAgency))
+      })
+      .catch(() => {
+        if (!ignore) setItems(agencies)
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false)
+      })
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   const filtered = useMemo(() => {
-    return agencies.filter((a) => {
+    return items.filter((a) => {
       const matchRegion = region === 'Toutes' || a.region === region
       const matchQuery =
         !query ||
@@ -83,7 +104,7 @@ export default function Agences() {
         a.name.toLowerCase().includes(query.toLowerCase())
       return matchRegion && matchQuery
     })
-  }, [region, query])
+  }, [items, region, query])
 
   return (
     <div className="bg-gris-clair pb-20">
@@ -162,7 +183,11 @@ export default function Agences() {
           <span className="text-sm text-gris-fonce">Trié par ville</span>
         </div>
 
-        {filtered.length === 0 ? (
+        {loading ? (
+          <p className="rounded-2xl border border-gris-moyen/50 bg-blanc p-10 text-center text-gris-fonce">
+            Chargement des agences...
+          </p>
+        ) : filtered.length === 0 ? (
           <p className="rounded-2xl border border-gris-moyen/50 bg-blanc p-10 text-center text-gris-fonce">
             Aucune agence ne correspond à votre recherche.
           </p>

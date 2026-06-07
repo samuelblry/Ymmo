@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import DashboardLayout, { KpiCard, Modal, SectionHeader } from '../../components/ui/DashboardLayout'
+import { apiFetch } from '../../lib/api'
 
 const b = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', viewBox: '0 0 24 24' }
 
@@ -42,6 +43,32 @@ const INIT_LOGS = [
   { id: 11, employe: 'Jean Dupont',    action: 'reset_mdp',       ip: '10.0.0.1',        succes: true,  date: '2024-02-09T09:00:00', agent: 'IT Admin Panel'       },
   { id: 12, employe: 'Isabelle Moreau',action: 'login',           ip: '10.0.0.18',       succes: true,  date: '2024-02-09T10:05:33', agent: 'Edge 121 / Windows'   },
 ]
+
+const mapCompte = (employe, roles, agences) => {
+  const role = roles.find((item) => item.id_role === employe.id_role)
+  const agence = agences.find((item) => item.id_agence === employe.id_agence)
+  return {
+    id: employe.id_employe,
+    prenom: employe.prenom,
+    nom: employe.nom,
+    email: employe.email,
+    id_role: role?.nom_role ?? 'Commercial',
+    id_agence: agence?.ville ?? 'Siège',
+    actif: employe.actif,
+    mfa_enabled: employe.mfa_enabled,
+    last_login: new Date().toISOString(),
+  }
+}
+
+const mapLog = (log) => ({
+  id: log.id_log,
+  employe: log.id_employe ? `Employé #${log.id_employe}` : '—',
+  action: log.action,
+  ip: log.ip_adresse ?? '—',
+  succes: log.succes,
+  date: log.date_heure,
+  agent: 'API Ymmo',
+})
 
 const ACTION_LABELS = { login: 'Connexion', logout: 'Déconnexion', tentative_echec: 'Échec auth', reset_mdp: 'Reset MDP' }
 const ACTION_CLS    = { login: 'bg-marron-clair text-marron', logout: 'bg-gris-clair text-gris-fonce', tentative_echec: 'bg-noir text-blanc', reset_mdp: 'border border-gris-fonce text-gris-fonce' }
@@ -347,7 +374,30 @@ const TABS = [
 export default function DashboardIT() {
   const [activeTab, setActiveTab] = useState('overview')
   const [comptes,   setComptes]   = useState(INIT_COMPTES)
-  const [logs]                    = useState(INIT_LOGS)
+  const [logs, setLogs]           = useState(INIT_LOGS)
+
+  useEffect(() => {
+    let ignore = false
+    Promise.allSettled([
+      apiFetch('/api/employes'),
+      apiFetch('/api/roles'),
+      apiFetch('/api/agences'),
+      apiFetch('/api/logs'),
+    ]).then(([employesResult, rolesResult, agencesResult, logsResult]) => {
+      if (ignore) return
+      const roles = rolesResult.status === 'fulfilled' ? rolesResult.value : []
+      const agences = agencesResult.status === 'fulfilled' ? agencesResult.value : []
+      if (employesResult.status === 'fulfilled') {
+        setComptes(employesResult.value.map((employe) => mapCompte(employe, roles, agences)))
+      }
+      if (logsResult.status === 'fulfilled') {
+        setLogs(logsResult.value.map(mapLog))
+      }
+    })
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   return (
     <DashboardLayout roleLabel="IT / Support" tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab}>

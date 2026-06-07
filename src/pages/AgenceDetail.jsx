@@ -1,7 +1,10 @@
+import { useEffect, useState } from 'react'
 import { Link, useParams, Navigate } from 'react-router-dom'
 import { agencies } from '../data/agencies'
 import { agenciesContent } from '../data/agenciesContent'
 import { getListingsByAgency } from '../data/listings'
+import { apiFetch } from '../lib/api'
+import { mapAgency, mapListing } from '../lib/dataMappers'
 import { Reveal, Stagger, StaggerItem } from '../components/ui/Reveal'
 import { BedIcon, BathIcon, AreaIcon } from '../components/ui/icons'
 
@@ -44,13 +47,43 @@ const CheckIcon = (p) => (
 
 export default function AgenceDetail() {
   const { id } = useParams()
-  const agency = agencies.find((a) => a.id === Number(id))
+  const fallbackAgency = agencies.find((a) => a.id === Number(id))
+  const [agency, setAgency] = useState(fallbackAgency)
+  const [listings, setListings] = useState(() => getListingsByAgency(Number(id)))
+  const [loading, setLoading] = useState(true)
   const content = agenciesContent[Number(id)]
 
-  if (!agency || !content) return <Navigate to="/agences" replace />
+  useEffect(() => {
+    let ignore = false
+    setLoading(true)
+    Promise.all([
+      apiFetch(`/api/agences/${id}`),
+      apiFetch(`/api/agences/${id}/biens`),
+    ])
+      .then(([agenceData, biensData]) => {
+        if (!ignore) {
+          setAgency(mapAgency(agenceData))
+          setListings(biensData.map(mapListing))
+        }
+      })
+      .catch(() => {
+        if (!ignore) {
+          setAgency(fallbackAgency)
+          setListings(getListingsByAgency(Number(id)))
+        }
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false)
+      })
+    return () => {
+      ignore = true
+    }
+  }, [fallbackAgency, id])
+
+  if (!loading && (!agency || !content)) return <Navigate to="/agences" replace />
+  if (!agency || !content) return null
 
   const others = agencies.filter((a) => a.region === agency.region && a.id !== agency.id).slice(0, 3)
-  const listings = getListingsByAgency(agency.id)
 
   return (
     <div className="pb-20">

@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { allListings } from '../data/listings'
+import { apiFetch } from '../lib/api'
+import { mapListing } from '../lib/dataMappers'
 import {
   SearchIcon,
   HeartIcon,
@@ -93,8 +95,54 @@ function ListingCard({ item }) {
 export default function Annonces() {
   const [type, setType] = useState('')
   const [piece, setPiece] = useState('')
+  const [city, setCity] = useState('')
+  const [priceMin, setPriceMin] = useState('')
+  const [priceMax, setPriceMax] = useState('')
+  const [surfaceMin, setSurfaceMin] = useState('')
+  const [surfaceMax, setSurfaceMax] = useState('')
+  const [search, setSearch] = useState('')
   const [selectedExtras, setSelectedExtras] = useState([])
   const [page, setPage] = useState(1)
+  const [listings, setListings] = useState(allListings)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams()
+    if (type) params.set('type', type)
+    if (city) params.set('ville', city)
+    if (priceMin) params.set('prix_min', priceMin)
+    if (priceMax) params.set('prix_max', priceMax)
+    if (surfaceMin) params.set('surface_min', surfaceMin)
+    if (surfaceMax) params.set('surface_max', surfaceMax)
+    if (piece) params.set('nb_pieces', piece.replace('+', ''))
+    return params.toString()
+  }, [city, piece, priceMax, priceMin, surfaceMax, surfaceMin, type])
+
+  useEffect(() => {
+    let ignore = false
+    setLoading(true)
+    apiFetch(`/api/biens${queryString ? `?${queryString}` : ''}`)
+      .then((data) => {
+        if (!ignore) {
+          setListings(data.map(mapListing))
+          setError('')
+          setPage(1)
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          setListings(allListings)
+          setError(err.message)
+        }
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false)
+      })
+    return () => {
+      ignore = true
+    }
+  }, [queryString])
 
   const toggleExtra = (e) =>
     setSelectedExtras((cur) => (cur.includes(e) ? cur.filter((x) => x !== e) : [...cur, e]))
@@ -102,8 +150,20 @@ export default function Annonces() {
   const reset = () => {
     setType('')
     setPiece('')
+    setCity('')
+    setPriceMin('')
+    setPriceMax('')
+    setSurfaceMin('')
+    setSurfaceMax('')
+    setSearch('')
     setSelectedExtras([])
   }
+
+  const visibleListings = listings.filter((item) => {
+    if (!search) return true
+    const value = search.toLowerCase()
+    return [item.title, item.city, item.type, item.address].some((field) => field?.toLowerCase().includes(value))
+  })
 
   return (
     <div className="bg-gris-clair pb-20">
@@ -134,6 +194,8 @@ export default function Annonces() {
             <h3 className="mb-3 text-sm font-semibold text-noir">Ville</h3>
             <input
               type="text"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
               placeholder="Entrez une ville"
               className="w-full rounded-full border border-gris-moyen bg-blanc px-4 py-2 text-sm text-noir placeholder:text-gris-fonce focus:border-marron focus:outline-none"
             />
@@ -145,6 +207,8 @@ export default function Annonces() {
               <div className="relative flex-1">
                 <input
                   type="text"
+                  value={priceMin}
+                  onChange={(e) => setPriceMin(e.target.value)}
                   placeholder="Minimum"
                   className="w-full rounded-full border border-gris-moyen bg-blanc px-4 py-2 text-sm placeholder:text-gris-fonce focus:border-marron focus:outline-none"
                 />
@@ -154,6 +218,8 @@ export default function Annonces() {
               <div className="relative flex-1">
                 <input
                   type="text"
+                  value={priceMax}
+                  onChange={(e) => setPriceMax(e.target.value)}
                   placeholder="Maximum"
                   className="w-full rounded-full border border-gris-moyen bg-blanc px-4 py-2 text-sm placeholder:text-gris-fonce focus:border-marron focus:outline-none"
                 />
@@ -168,6 +234,8 @@ export default function Annonces() {
               <div className="relative flex-1">
                 <input
                   type="text"
+                  value={surfaceMin}
+                  onChange={(e) => setSurfaceMin(e.target.value)}
                   placeholder="Minimum"
                   className="w-full rounded-full border border-gris-moyen bg-blanc px-4 py-2 text-sm placeholder:text-gris-fonce focus:border-marron focus:outline-none"
                 />
@@ -177,6 +245,8 @@ export default function Annonces() {
               <div className="relative flex-1">
                 <input
                   type="text"
+                  value={surfaceMax}
+                  onChange={(e) => setSurfaceMax(e.target.value)}
                   placeholder="Maximum"
                   className="w-full rounded-full border border-gris-moyen bg-blanc px-4 py-2 text-sm placeholder:text-gris-fonce focus:border-marron focus:outline-none"
                 />
@@ -229,6 +299,8 @@ export default function Annonces() {
             <SearchIcon className="h-4 w-4 text-gris-fonce" />
             <input
               type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Ville, type de bien, budget..."
               className="flex-1 bg-transparent text-sm text-noir placeholder:text-gris-fonce focus:outline-none"
             />
@@ -241,11 +313,23 @@ export default function Annonces() {
             </select>
           </div>
 
+          {error && (
+            <p className="mt-4 rounded-2xl border border-marron/30 bg-marron-clair px-5 py-3 text-sm text-marron-fonce">
+              API indisponible, affichage des donnees locales.
+            </p>
+          )}
+
+          {loading ? (
+            <p className="mt-6 rounded-2xl border border-gris-moyen/50 bg-blanc p-10 text-center text-gris-fonce">
+              Chargement des annonces...
+            </p>
+          ) : (
           <div className="mt-6 grid gap-6 sm:grid-cols-2">
-            {allListings.map((item) => (
+            {visibleListings.map((item) => (
               <ListingCard key={item.id} item={item} />
             ))}
           </div>
+          )}
 
           {/* Pagination */}
           <div className="mt-10 flex items-center justify-center gap-2">

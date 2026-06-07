@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import DashboardLayout, { KpiCard, Modal, SectionHeader } from '../../components/ui/DashboardLayout'
+import { apiFetch } from '../../lib/api'
 
 const b = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', viewBox: '0 0 24 24' }
 
@@ -22,6 +23,24 @@ const INIT_ARTICLES = [
   { id: 4, titre: "Guide de l'acheteur premier logement",   statut: 'brouillon', date_envoi: '2024-02-08', image_url: '/img/listing-2.png', vues: 0,    likes: 0,   contenu: '' },
   { id: 5, titre: 'Tendances décoration 2024',              statut: 'brouillon', date_envoi: '2024-02-10', image_url: '/img/listing-1.png', vues: 0,    likes: 0,   contenu: '' },
 ]
+
+const mapDashboardArticle = (article) => ({
+  id: article.id_article,
+  titre: article.titre,
+  statut: article.statut === 'publie' ? 'publié' : article.statut,
+  date_envoi: article.date_envoi,
+  image_url: article.image_url,
+  vues: 0,
+  likes: 0,
+  contenu: article.contenu,
+})
+
+const toArticlePayload = (data) => ({
+  titre: data.titre,
+  contenu: data.contenu || 'Article redige depuis le dashboard marketing Ymmo.',
+  image_url: data.image_url || '/img/blog-1.png',
+  statut: data.statut === 'publié' ? 'publie' : data.statut,
+})
 
 function ArticleForm({ initial, onSave, onCancel }) {
   const [form, setForm] = useState(initial ?? { titre: '', contenu: '', statut: 'brouillon', image_url: '' })
@@ -109,17 +128,56 @@ function Articles({ articles, setArticles }) {
   const [modal,    setModal]    = useState(null)
   const [deleteId, setDeleteId] = useState(null)
 
-  const handleSave = (data) => {
+  const handleSave = async (data) => {
     if (modal === 'create') {
-      setArticles(prev => [...prev, { ...data, id: Date.now(), vues: 0, likes: 0, date_envoi: new Date().toISOString().slice(0, 10) }])
+      try {
+        const created = await apiFetch('/api/articles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(toArticlePayload(data)),
+        })
+        setArticles(prev => [...prev, mapDashboardArticle(created)])
+      } catch {
+        setArticles(prev => [...prev, { ...data, id: Date.now(), vues: 0, likes: 0, date_envoi: new Date().toISOString().slice(0, 10) }])
+      }
     } else {
-      setArticles(prev => prev.map(a => a.id === modal.id ? { ...a, ...data } : a))
+      try {
+        const updated = await apiFetch(`/api/articles/${modal.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(toArticlePayload(data)),
+        })
+        setArticles(prev => prev.map(a => a.id === modal.id ? mapDashboardArticle(updated) : a))
+      } catch {
+        setArticles(prev => prev.map(a => a.id === modal.id ? { ...a, ...data } : a))
+      }
     }
     setModal(null)
   }
 
-  const toggleStatut  = (id) => setArticles(prev => prev.map(a => a.id === id ? { ...a, statut: a.statut === 'publié' ? 'brouillon' : 'publié' } : a))
-  const handleDelete  = () => { setArticles(prev => prev.filter(a => a.id !== deleteId)); setDeleteId(null) }
+  const toggleStatut  = async (id) => {
+    const article = articles.find((item) => item.id === id)
+    const statut = article?.statut === 'publié' ? 'brouillon' : 'publié'
+    setArticles(prev => prev.map(a => a.id === id ? { ...a, statut } : a))
+    try {
+      await apiFetch(`/api/articles/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statut: statut === 'publié' ? 'publie' : statut }),
+      })
+    } catch {
+      // Fallback local pour la demo.
+    }
+  }
+  const handleDelete  = async () => {
+    try {
+      await apiFetch(`/api/articles/${deleteId}`, { method: 'DELETE' })
+    } catch {
+      // Fallback local pour la demo.
+    }
+    setArticles(prev => prev.filter(a => a.id !== deleteId))
+    setDeleteId(null)
+  }
 
   return (
     <div>
@@ -253,6 +311,25 @@ const TABS = [
 export default function DashboardMarketing() {
   const [activeTab, setActiveTab]   = useState('overview')
   const [articles,  setArticles]    = useState(INIT_ARTICLES)
+
+  useEffect(() => {
+    let ignore = false
+    Promise.allSettled([
+      apiFetch('/api/articles/all'),
+      apiFetch('/api/stats/articles'),
+    ]).then(([articlesResult, statsResult]) => {
+      if (ignore || articlesResult.status !== 'fulfilled') return
+      const stats = statsResult.status === 'fulfilled' ? statsResult.value : []
+      const withStats = articlesResult.value.map((article) => {
+        const stat = stats.find((item) => item.id_article === article.id_article)
+        return { ...mapDashboardArticle(article), vues: stat?.vues ?? 0, likes: stat?.likes ?? 0 }
+      })
+      setArticles(withStats)
+    })
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   return (
     <DashboardLayout roleLabel="Marketing" tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab}>

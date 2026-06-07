@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, Navigate } from 'react-router-dom'
 import { getListing, similarListings } from '../data/listings'
+import { apiFetch } from '../lib/api'
+import { mapListing } from '../lib/dataMappers'
 import {
   HeartIcon,
   BedIcon,
@@ -62,17 +64,63 @@ function TerraceIcon(props) {
 
 export default function AnnonceDetail() {
   const { id } = useParams()
-  const listing = useMemo(() => getListing(id), [id])
+  const fallbackListing = useMemo(() => getListing(id), [id])
+  const [listing, setListing] = useState(fallbackListing)
+  const [loading, setLoading] = useState(true)
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
   const [index, setIndex] = useState(0)
 
-  if (!listing) return <Navigate to="/annonces" replace />
+  useEffect(() => {
+    let ignore = false
+    setLoading(true)
+    apiFetch(`/api/biens/${id}`)
+      .then((data) => {
+        if (!ignore) {
+          setListing(mapListing(data))
+          setError('')
+        }
+      })
+      .catch(() => {
+        if (!ignore) setListing(fallbackListing)
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false)
+      })
+    return () => {
+      ignore = true
+    }
+  }, [fallbackListing, id])
+
+  if (!loading && !listing) return <Navigate to="/annonces" replace />
+  if (!listing) return null
   const images = listing.images
   const next = () => setIndex((i) => (i + 1) % images.length)
   const prev = () => setIndex((i) => (i - 1 + images.length) % images.length)
 
   const [form, setForm] = useState({ name: '', email: '', phone: '' })
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault()
+    setError('')
+    const [prenom, ...nomParts] = form.name.trim().split(/\s+/)
+    try {
+      await apiFetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id_agence_dest: listing.agencyId,
+          prenom,
+          nom: nomParts.join(' ') || prenom,
+          email: form.email,
+          telephone: form.phone || null,
+          sujet: `Annonce ${listing.id}`,
+          contenu: `Je suis interesse par le bien ${listing.title}. Pourriez-vous me contacter ?`,
+        }),
+      })
+      setSent(true)
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   return (
@@ -230,8 +278,19 @@ export default function AnnonceDetail() {
             </a>
 
             <form onSubmit={onSubmit} className="mt-4 space-y-3">
+              {sent && (
+                <p className="rounded-xl bg-marron-clair px-4 py-3 text-sm text-marron-fonce">
+                  Message envoye a l'agence.
+                </p>
+              )}
+              {error && (
+                <p className="rounded-xl bg-marron-clair px-4 py-3 text-sm text-marron-fonce">
+                  {error}
+                </p>
+              )}
               <input
                 type="text"
+                required
                 placeholder="Nom et prénom"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -239,6 +298,7 @@ export default function AnnonceDetail() {
               />
               <input
                 type="email"
+                required
                 placeholder="E-mail"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}

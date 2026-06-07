@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { articles } from '../data/articles'
+import { apiFetch } from '../lib/api'
+import { mapArticle } from '../lib/dataMappers'
 import NotFound from './NotFound'
 
 function formatDate(iso) {
@@ -17,11 +20,41 @@ function ArrowLeftIcon(props) {
 
 export default function BlogArticle() {
   const { id } = useParams()
-  const article = articles.find((a) => String(a.id) === String(id))
+  const fallbackArticle = articles.find((a) => String(a.id) === String(id))
+  const [article, setArticle] = useState(fallbackArticle)
+  const [items, setItems] = useState(articles)
+  const [loading, setLoading] = useState(true)
 
+  useEffect(() => {
+    let ignore = false
+    Promise.all([
+      apiFetch(`/api/articles/${id}`),
+      apiFetch('/api/articles'),
+    ])
+      .then(([articleData, articlesData]) => {
+        if (!ignore) {
+          setArticle(mapArticle(articleData))
+          setItems(articlesData.map(mapArticle))
+        }
+      })
+      .catch(() => {
+        if (!ignore) {
+          setArticle(fallbackArticle)
+          setItems(articles)
+        }
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false)
+      })
+    return () => {
+      ignore = true
+    }
+  }, [fallbackArticle, id])
+
+  if (loading && !article) return null
   if (!article) return <NotFound />
 
-  const related = articles.filter((a) => a.id !== article.id && a.categorie === article.categorie).slice(0, 3)
+  const related = items.filter((a) => a.id !== article.id && a.categorie === article.categorie).slice(0, 3)
 
   return (
     <div className="bg-gris-clair pb-20">

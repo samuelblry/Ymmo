@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import DashboardLayout, { KpiCard, Modal, SectionHeader } from '../../components/ui/DashboardLayout'
+import { apiFetch } from '../../lib/api'
+import { mapListing } from '../../lib/dataMappers'
 
 const b = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', viewBox: '0 0 24 24' }
 
@@ -35,6 +37,36 @@ const INIT_MESSAGES = [
   { id: 4, nom: 'Durand',  prenom: 'Paul',     email: 'paul.durand@email.fr',   telephone: '07 11 22 33 44', sujet: 'Offre maison village',        contenu: "Je souhaite faire une offre pour la maison de village. Pouvez-vous me contacter dès que possible ?",                          lu: true,  date_envoi: '2024-02-07T16:45:00' },
   { id: 5, nom: 'Petit',   prenom: 'Marie',    email: 'marie.petit@email.fr',   telephone: '06 88 77 66 55', sujet: 'Disponibilité terrain',      contenu: "Le terrain constructible est-il toujours disponible ? Merci de me tenir informée.",                                          lu: true,  date_envoi: '2024-02-06T11:20:00' },
 ]
+
+const mapDashboardBien = (bien) => {
+  const item = mapListing(bien)
+  return {
+    id: item.id,
+    titre: item.title,
+    prix: item.price,
+    ville: item.city,
+    type_bien: item.type,
+    surface: item.area,
+    statut: item.status,
+    vues: 0,
+    contacts: 0,
+    likes: 0,
+    date_ajout: bien.date_ajout,
+    image: item.image,
+  }
+}
+
+const mapDashboardMessage = (message) => ({
+  id: message.id_message,
+  nom: message.nom,
+  prenom: message.prenom,
+  email: message.email,
+  telephone: message.telephone,
+  sujet: message.sujet,
+  contenu: message.contenu,
+  lu: message.lu,
+  date_envoi: message.date_envoi,
+})
 
 function BienForm({ initial, onSave, onCancel }) {
   const [form, setForm] = useState(initial ?? { titre: '', prix: '', ville: '', type_bien: 'Maison', surface: '', statut: 'disponible' })
@@ -128,21 +160,77 @@ function Overview({ biens, messages }) {
   )
 }
 
+function toBienPayload(data) {
+  return {
+    id_agence: 1,
+    titre: data.titre,
+    description: data.description ?? 'Bien gere depuis le dashboard commercial Ymmo.',
+    adresse: data.adresse ?? `${data.ville}, ${data.ville}`,
+    prix: data.prix,
+    surface: data.surface,
+    type_bien: data.type_bien,
+    ville: data.ville,
+    code_postal: data.code_postal ?? '00000',
+    statut: data.statut,
+    nb_pieces: data.nb_pieces ?? 3,
+    nb_chambres: data.nb_chambres ?? 2,
+    nb_sdb: data.nb_sdb ?? 1,
+    caracteristiques: data.caracteristiques ?? 'DPE B',
+  }
+}
+
 function Annonces({ biens, setBiens }) {
   const [modal, setModal]     = useState(null)
   const [deleteId, setDeleteId] = useState(null)
 
-  const handleSave = (data) => {
+  const handleSave = async (data) => {
     if (modal === 'create') {
-      setBiens(prev => [...prev, { ...data, id: Date.now(), vues: 0, contacts: 0, likes: 0, date_ajout: new Date().toISOString().slice(0, 10), image: '/img/listing-1.png' }])
+      try {
+        const created = await apiFetch('/api/biens', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(toBienPayload(data)),
+        })
+        setBiens(prev => [...prev, mapDashboardBien(created)])
+      } catch {
+        setBiens(prev => [...prev, { ...data, id: Date.now(), vues: 0, contacts: 0, likes: 0, date_ajout: new Date().toISOString().slice(0, 10), image: '/img/listing-1.png' }])
+      }
     } else {
-      setBiens(prev => prev.map(b => b.id === modal.id ? { ...b, ...data } : b))
+      try {
+        const updated = await apiFetch(`/api/biens/${modal.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(toBienPayload({ ...modal, ...data })),
+        })
+        setBiens(prev => prev.map(b => b.id === modal.id ? mapDashboardBien(updated) : b))
+      } catch {
+        setBiens(prev => prev.map(b => b.id === modal.id ? { ...b, ...data } : b))
+      }
     }
     setModal(null)
   }
 
-  const handleDelete = () => { setBiens(prev => prev.filter(b => b.id !== deleteId)); setDeleteId(null) }
-  const changeStatut = (id, statut) => setBiens(prev => prev.map(b => b.id === id ? { ...b, statut } : b))
+  const handleDelete = async () => {
+    try {
+      await apiFetch(`/api/biens/${deleteId}`, { method: 'DELETE' })
+    } catch {
+      // Fallback local si l'API est indisponible.
+    }
+    setBiens(prev => prev.filter(b => b.id !== deleteId))
+    setDeleteId(null)
+  }
+  const changeStatut = async (id, statut) => {
+    setBiens(prev => prev.map(b => b.id === id ? { ...b, statut } : b))
+    try {
+      await apiFetch(`/api/biens/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statut }),
+      })
+    } catch {
+      // La selection reste visible localement pour ne pas bloquer la demo.
+    }
+  }
 
   return (
     <div>
@@ -225,6 +313,7 @@ function Messages({ messages, setMessages }) {
   const handleSelect = (msg) => {
     setSelected(msg)
     setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, lu: true } : m))
+    apiFetch(`/api/messages/${msg.id}/lu`, { method: 'PUT' }).catch(() => {})
   }
 
   return (
@@ -341,6 +430,25 @@ export default function DashboardCommercial() {
   const [activeTab, setActiveTab] = useState('overview')
   const [biens,     setBiens]     = useState(INIT_BIENS)
   const [messages,  setMessages]  = useState(INIT_MESSAGES)
+
+  useEffect(() => {
+    let ignore = false
+    Promise.allSettled([
+      apiFetch('/api/biens'),
+      apiFetch('/api/messages'),
+    ]).then(([biensResult, messagesResult]) => {
+      if (ignore) return
+      if (biensResult.status === 'fulfilled') {
+        setBiens(biensResult.value.map(mapDashboardBien))
+      }
+      if (messagesResult.status === 'fulfilled') {
+        setMessages(messagesResult.value.map(mapDashboardMessage))
+      }
+    })
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   return (
     <DashboardLayout roleLabel="Commercial" tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab}>

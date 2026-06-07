@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { articles, categoriesArticles } from '../data/articles'
+import { apiFetch } from '../lib/api'
+import { mapArticle } from '../lib/dataMappers'
 import { SearchIcon } from '../components/ui/icons'
 
 function formatDate(iso) {
@@ -56,9 +58,28 @@ function ArticleCard({ article, featured = false }) {
 export default function Blog() {
   const [categorie, setCategorie] = useState('Toutes')
   const [query, setQuery] = useState('')
+  const [items, setItems] = useState(articles)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let ignore = false
+    apiFetch('/api/articles')
+      .then((data) => {
+        if (!ignore) setItems(data.map(mapArticle))
+      })
+      .catch(() => {
+        if (!ignore) setItems(articles)
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false)
+      })
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   const filtered = useMemo(() => {
-    return articles.filter((a) => {
+    return items.filter((a) => {
       const matchCat = categorie === 'Toutes' || a.categorie === categorie
       const matchQuery =
         !query ||
@@ -66,7 +87,7 @@ export default function Blog() {
         a.extrait.toLowerCase().includes(query.toLowerCase())
       return matchCat && matchQuery
     })
-  }, [categorie, query])
+  }, [categorie, items, query])
 
   const [featured, ...rest] = filtered
 
@@ -137,7 +158,11 @@ export default function Blog() {
           <span className="text-sm text-gris-fonce">Trié par date</span>
         </div>
 
-        {filtered.length === 0 ? (
+        {loading ? (
+          <p className="rounded-2xl border border-gris-moyen/50 bg-blanc p-10 text-center text-gris-fonce">
+            Chargement des articles...
+          </p>
+        ) : filtered.length === 0 ? (
           <p className="rounded-2xl border border-gris-moyen/50 bg-blanc p-10 text-center text-gris-fonce">
             Aucun article ne correspond à votre recherche.
           </p>

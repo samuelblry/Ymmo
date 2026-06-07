@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import DashboardLayout, { KpiCard, Modal, SectionHeader } from '../../components/ui/DashboardLayout'
+import { apiFetch } from '../../lib/api'
 
 const b = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', viewBox: '0 0 24 24' }
 
@@ -42,6 +43,29 @@ const AGENCES_DETAIL = [
   { id: 11, nom: 'Ymmo Strasbourg',     ville: 'Strasbourg',       telephone: '03 88 00 11 22', email: 'strasbourg@ymmo.fr' },
   { id: 12, nom: 'Ymmo Rennes',         ville: 'Rennes',           telephone: '02 99 00 11 22', email: 'rennes@ymmo.fr' },
 ]
+
+const mapEmploye = (employe, roles, agences) => {
+  const role = roles.find((item) => item.id_role === employe.id_role)
+  const agence = agences.find((item) => item.id_agence === employe.id_agence)
+  return {
+    id: employe.id_employe,
+    nom: employe.nom,
+    prenom: employe.prenom,
+    email: employe.email,
+    telephone: employe.telephone,
+    id_role: role?.nom_role ?? 'Commercial',
+    id_agence: agence?.ville ?? 'Siège',
+    actif: employe.actif,
+  }
+}
+
+const mapAgence = (agence) => ({
+  id: agence.id_agence,
+  nom: agence.nom_agence,
+  ville: agence.ville,
+  telephone: agence.telephone,
+  email: agence.email,
+})
 
 function EmployeForm({ initial, onSave, onCancel }) {
   const [form, setForm] = useState(initial ?? { prenom: '', nom: '', email: '', telephone: '', id_role: 'Commercial', id_agence: 'Aix-en-Provence', actif: true })
@@ -244,12 +268,12 @@ function Employes({ employes, setEmployes }) {
   )
 }
 
-function Agences({ employes }) {
+function Agences({ employes, agences }) {
   return (
     <div>
       <SectionHeader title="Agences" />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {AGENCES_DETAIL.map(a => {
+        {agences.map(a => {
           const equipe = employes.filter(e => e.id_agence === a.ville && e.actif)
           return (
             <div key={a.id} className="rounded-2xl border border-gris-moyen/40 bg-blanc p-6 shadow-sm">
@@ -297,12 +321,35 @@ const TABS = [
 export default function DashboardRH() {
   const [activeTab, setActiveTab] = useState('overview')
   const [employes,  setEmployes]  = useState(INIT_EMPLOYES)
+  const [agences, setAgences] = useState(AGENCES_DETAIL)
+
+  useEffect(() => {
+    let ignore = false
+    Promise.allSettled([
+      apiFetch('/api/employes'),
+      apiFetch('/api/roles'),
+      apiFetch('/api/agences'),
+    ]).then(([employesResult, rolesResult, agencesResult]) => {
+      if (ignore) return
+      const roles = rolesResult.status === 'fulfilled' ? rolesResult.value : []
+      const apiAgences = agencesResult.status === 'fulfilled' ? agencesResult.value : []
+      if (agencesResult.status === 'fulfilled') {
+        setAgences(apiAgences.map(mapAgence))
+      }
+      if (employesResult.status === 'fulfilled') {
+        setEmployes(employesResult.value.map((employe) => mapEmploye(employe, roles, apiAgences)))
+      }
+    })
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   return (
     <DashboardLayout roleLabel="RH / Juridique" tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab}>
       {activeTab === 'overview' && <Overview employes={employes} />}
       {activeTab === 'employes' && <Employes employes={employes} setEmployes={setEmployes} />}
-      {activeTab === 'agences'  && <Agences  employes={employes} />}
+      {activeTab === 'agences'  && <Agences  employes={employes} agences={agences} />}
     </DashboardLayout>
   )
 }

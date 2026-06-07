@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import DashboardLayout, { KpiCard, SectionHeader } from '../../components/ui/DashboardLayout'
+import { apiFetch } from '../../lib/api'
 
 const b = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', viewBox: '0 0 24 24' }
 
@@ -48,20 +49,20 @@ const PREDICTIONS = [
   { ville: 'Aix Centre-ville',     tendance: '+4,9% prévu',  score: 74, type: 'Appartement' },
 ]
 
-function Overview() {
-  const total_ca      = AGENCES.reduce((s, a) => s + a.ca, 0)
-  const total_vendus  = AGENCES.reduce((s, a) => s + a.biens_vendus, 0)
-  const total_actifs  = AGENCES.reduce((s, a) => s + a.biens_actifs, 0)
-  const top_agence    = [...AGENCES].sort((a, c) => c.ca - a.ca)[0]
+function Overview({ agences }) {
+  const total_ca      = agences.reduce((s, a) => s + a.ca, 0)
+  const total_vendus  = agences.reduce((s, a) => s + a.biens_vendus, 0)
+  const total_actifs  = agences.reduce((s, a) => s + a.biens_actifs, 0)
+  const top_agence    = [...agences].sort((a, c) => c.ca - a.ca)[0]
 
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold text-noir">Vue d'ensemble Ymmo</h1>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <KpiCard label="CA total réseau"    value={euro(total_ca)}     sub="12 agences"           Icon={EuroIcon}    />
+        <KpiCard label="CA total réseau"    value={euro(total_ca)}     sub={`${agences.length} agences`} Icon={EuroIcon}    />
         <KpiCard label="Biens vendus"       value={total_vendus}       sub="contrats signés"      Icon={HomeIcon}    />
         <KpiCard label="Annonces actives"   value={total_actifs}       sub="en ligne"             Icon={BuildingIcon}/>
-        <KpiCard label="Agences réseau"     value={12}                 sub="France entière"       Icon={MapIcon}     />
+        <KpiCard label="Agences réseau"     value={agences.length}     sub="France entière"       Icon={MapIcon}     />
         <KpiCard label="Agents terrain"     value={51}                 sub="commerciaux actifs"   Icon={UsersIcon}   />
         <KpiCard label="Agence leader"      value={top_agence.nom.replace('Ymmo ','')} sub={euro(top_agence.ca)} Icon={TrendIcon} />
       </div>
@@ -69,7 +70,7 @@ function Overview() {
       <div className="mt-8 rounded-2xl border border-gris-moyen/40 bg-blanc p-6 shadow-sm">
         <h2 className="mb-5 text-lg font-bold text-noir">Classement CA — top 5</h2>
         <div className="space-y-4">
-          {AGENCES.slice(0, 5).map((a, i) => (
+          {agences.slice(0, 5).map((a, i) => (
             <div key={a.id} className="flex items-center gap-4">
               <span className="w-5 shrink-0 text-sm font-bold text-gris-fonce">{i + 1}</span>
               <div className="flex-1">
@@ -78,7 +79,7 @@ function Overview() {
                   <span className="font-semibold text-marron">{euro(a.ca)}</span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-gris-moyen/30">
-                  <div className="h-2 rounded-full bg-marron transition-all" style={{ width: `${(a.ca / AGENCES[0].ca) * 100}%` }} />
+                  <div className="h-2 rounded-full bg-marron transition-all" style={{ width: `${(a.ca / agences[0].ca) * 100}%` }} />
                 </div>
               </div>
             </div>
@@ -89,8 +90,8 @@ function Overview() {
   )
 }
 
-function AgencesTab() {
-  const maxCA = AGENCES[0].ca
+function AgencesTab({ agences }) {
+  const maxCA = agences[0]?.ca || 1
 
   return (
     <div>
@@ -109,7 +110,7 @@ function AgencesTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gris-moyen/30">
-              {AGENCES.map((a, i) => (
+              {agences.map((a, i) => (
                 <tr key={a.id} className="hover:bg-gris-clair/30">
                   <td className="px-6 py-4">
                     <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
@@ -138,14 +139,14 @@ function AgencesTab() {
   )
 }
 
-function BiensTab() {
+function BiensTab({ agences }) {
   return (
     <div>
       <SectionHeader title="Biens — vue globale" />
       <div className="grid gap-4 sm:grid-cols-3 mb-6">
-        <KpiCard label="Total vendus"        value={AGENCES.reduce((s, a) => s + a.biens_vendus, 0)} Icon={HomeIcon}  />
-        <KpiCard label="Annonces actives"    value={AGENCES.reduce((s, a) => s + a.biens_actifs, 0)}  Icon={EuroIcon}  />
-        <KpiCard label="Agence la + active"  value="Paris"                                             sub="18 biens actifs" Icon={TrendIcon} />
+        <KpiCard label="Total vendus"        value={agences.reduce((s, a) => s + a.biens_vendus, 0)} Icon={HomeIcon}  />
+        <KpiCard label="Annonces actives"    value={agences.reduce((s, a) => s + a.biens_actifs, 0)}  Icon={EuroIcon}  />
+        <KpiCard label="Agence la + active"  value={agences[0]?.ville ?? '—'} sub={`${agences[0]?.biens_actifs ?? 0} biens actifs`} Icon={TrendIcon} />
       </div>
       <div className="overflow-hidden rounded-2xl border border-gris-moyen/40 bg-blanc shadow-sm">
         <div className="overflow-x-auto">
@@ -159,7 +160,7 @@ function BiensTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gris-moyen/30">
-              {AGENCES.map(a => (
+              {agences.map(a => (
                 <tr key={a.id} className="hover:bg-gris-clair/30">
                   <td className="px-6 py-4 font-medium text-noir">{a.nom}</td>
                   <td className="px-4 py-4 text-right text-noir">{a.biens_vendus}</td>
@@ -177,15 +178,15 @@ function BiensTab() {
   )
 }
 
-function BlogTab() {
-  const total_vues  = ARTICLES.reduce((s, a) => s + a.vues, 0)
-  const total_likes = ARTICLES.reduce((s, a) => s + a.likes, 0)
+function BlogTab({ articles }) {
+  const total_vues  = articles.reduce((s, a) => s + a.vues, 0)
+  const total_likes = articles.reduce((s, a) => s + a.likes, 0)
 
   return (
     <div>
       <SectionHeader title="Blog — performance" />
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <KpiCard label="Articles publiés" value={ARTICLES.length}                          Icon={BookIcon} />
+        <KpiCard label="Articles publiés" value={articles.length}                          Icon={BookIcon} />
         <KpiCard label="Vues totales"     value={total_vues.toLocaleString('fr-FR')}       Icon={UsersIcon} />
         <KpiCard label="Likes totaux"     value={total_likes}                              Icon={TrendIcon} />
       </div>
@@ -201,7 +202,7 @@ function BlogTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gris-moyen/30">
-              {[...ARTICLES].sort((a, c) => c.vues - a.vues).map(a => (
+              {[...articles].sort((a, c) => c.vues - a.vues).map(a => (
                 <tr key={a.id} className="hover:bg-gris-clair/30">
                   <td className="px-6 py-4">
                     <p className="font-medium text-noir">{a.titre}</p>
@@ -222,7 +223,7 @@ function BlogTab() {
   )
 }
 
-function AnalyseTab() {
+function AnalyseTab({ predictions }) {
   return (
     <div>
       <SectionHeader title="Analyse prédictive" />
@@ -235,7 +236,7 @@ function AnalyseTab() {
 
       <h2 className="mb-4 text-lg font-bold text-noir">Zones attractives — score de potentiel</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {PREDICTIONS.map(p => (
+        {predictions.map(p => (
           <div key={p.ville} className="rounded-2xl border border-gris-moyen/40 bg-blanc p-5 shadow-sm">
             <div className="flex items-start justify-between">
               <div>
@@ -276,14 +277,59 @@ const TABS = [
 
 export default function DashboardDirection() {
   const [activeTab, setActiveTab] = useState('overview')
+  const [agences, setAgences] = useState(AGENCES)
+  const [articles, setArticles] = useState(ARTICLES)
+  const [predictions, setPredictions] = useState(PREDICTIONS)
+
+  useEffect(() => {
+    let ignore = false
+    Promise.allSettled([
+      apiFetch('/api/stats/agences'),
+      apiFetch('/api/stats/articles'),
+      apiFetch('/api/analytics/predictions'),
+    ]).then(([agencesResult, articlesResult, predictionsResult]) => {
+      if (ignore) return
+      if (agencesResult.status === 'fulfilled') {
+        setAgences(agencesResult.value.map((item, index) => ({
+          id: index + 1,
+          nom: item.agence,
+          ville: item.agence.replace('Ymmo ', ''),
+          ca: Number(item.valeur_portefeuille),
+          biens_vendus: 0,
+          biens_actifs: item.nb_biens,
+          agents: 0,
+        })).sort((a, b) => b.ca - a.ca))
+      }
+      if (articlesResult.status === 'fulfilled') {
+        setArticles(articlesResult.value.map((item) => ({
+          id: item.id_article,
+          titre: item.titre,
+          date: new Date().toISOString(),
+          vues: item.vues,
+          likes: item.likes,
+        })))
+      }
+      if (predictionsResult.status === 'fulfilled') {
+        setPredictions(predictionsResult.value.map((item) => ({
+          ville: item.ville,
+          tendance: `${Math.round(item.prix_m2_moyen).toLocaleString('fr-FR')} €/m² moyen`,
+          score: Math.round(item.score_attractivite),
+          type: `Est. 90m² : ${euro(Math.round(item.estimation_90m2))}`,
+        })))
+      }
+    })
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   return (
     <DashboardLayout roleLabel="Direction" tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab}>
-      {activeTab === 'overview' && <Overview />}
-      {activeTab === 'agences'  && <AgencesTab />}
-      {activeTab === 'biens'    && <BiensTab />}
-      {activeTab === 'blog'     && <BlogTab />}
-      {activeTab === 'analyse'  && <AnalyseTab />}
+      {activeTab === 'overview' && <Overview agences={agences} />}
+      {activeTab === 'agences'  && <AgencesTab agences={agences} />}
+      {activeTab === 'biens'    && <BiensTab agences={agences} />}
+      {activeTab === 'blog'     && <BlogTab articles={articles} />}
+      {activeTab === 'analyse'  && <AnalyseTab predictions={predictions} />}
     </DashboardLayout>
   )
 }
