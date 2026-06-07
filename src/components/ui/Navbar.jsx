@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, NavLink, useLocation } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 const links = [
@@ -13,7 +13,6 @@ const links = [
 export default function Navbar() {
   const { user } = useAuth()
   const [open, setOpen] = useState(false)
-  const location = useLocation()
 
   // close on navigation
   const close = () => setOpen(false)

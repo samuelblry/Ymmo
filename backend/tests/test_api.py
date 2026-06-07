@@ -1,3 +1,8 @@
+import os
+
+os.environ["DATABASE_URL"] = "sqlite:///./test_ymmo.db"
+os.environ["SECRET_KEY"] = "test-secret-key-for-ymmo-api-tests"
+
 from fastapi.testclient import TestClient
 
 from app.main import app

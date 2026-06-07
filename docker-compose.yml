@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: ymmo-postgres
+    environment:
+      POSTGRES_DB: ymmo
+      POSTGRES_USER: ymmo
+      POSTGRES_PASSWORD: ymmo_password
+    ports:
+      - "55432:5432"
+    volumes:
+      - ymmo_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ymmo -d ymmo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+    container_name: ymmo-api
+    environment:
+      DATABASE_URL: postgresql+pg8000://ymmo:ymmo_password@postgres:5432/ymmo
+      SECRET_KEY: ymmo-dev-secret-change-before-production-64-characters-minimum-demo
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 15
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      SECURE_COOKIES: "false"
+      LOGIN_RATE_LIMIT: 5
+      LOGIN_RATE_WINDOW_MINUTES: 15
+    ports:
+      - "8000:8000"
+    volumes:
+      - ymmo_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      args:
+        VITE_API_URL: http://localhost:8000
+    container_name: ymmo-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+
+  adminer:
+    image: adminer:4
+    container_name: ymmo-adminer
+    ports:
+      - "8082:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  ymmo_postgres_data:
+  ymmo_uploads:

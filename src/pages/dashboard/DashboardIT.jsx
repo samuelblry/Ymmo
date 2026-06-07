@@ -14,7 +14,6 @@ const CheckIcon   = (p) => <svg {...b} {...p}><polyline points="20 6 9 17 4 12"/
 const ShieldIcon  = (p) => <svg {...b} {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
 
 const fmtdt = (d) => new Date(d).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
-const fmt   = (d) => new Date(d).toLocaleDateString('fr-FR')
 
 const ROLE_LABELS = { Commercial: 'Commercial', Marketing: 'Marketing', RH_Juridique: 'RH / Jur.', Direction: 'Direction', IT_Support: 'IT / Support' }
 

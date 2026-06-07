@@ -1,5 +1,3 @@
-const altImage = (i) => (i % 2 === 0 ? '/img/listing-1.png' : '/img/listing-2.png')
-
 const gallery = ['/img/listing-1.png', '/img/listing-2.png']
 
 export const listingsDetailed = [
