@@ -123,6 +123,6 @@ Source modifiable : [docs/bdd_schema.mmd](docs/bdd_schema.mmd) (Mermaid ERD).
 
 ## Équipe
 
-- **Matias Bouchenoire** — Frontend + UX/UI
-- **Samuel Bouhnik-Loury** — Backend + UX/UI + Cyber
-- **William Pons** — Backend + Infra/Cyber
+- **Matias Bouchenoire** — Frontend + Backend
+- **Samuel Bouhnik-Loury** — Frontend + Cyber
+- **William Pons** — Infra + Cyber
