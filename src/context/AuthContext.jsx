@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useCallback, useContext, useState } from 'react'
 import { apiFetch, setAccessToken } from '../lib/api'
 
 const AuthContext = createContext(null)
@@ -18,6 +18,7 @@ const toUser = (authData, email, profile = {}) => ({
   email,
   firstName: profile.firstName ?? (authData.role ? authData.role.replace('_', ' ') : 'Compte'),
   lastName: profile.lastName ?? 'Ymmo',
+  telephone: profile.telephone ?? '',
   dashboardPath: dashboardPath(authData.role),
 })
 
@@ -74,10 +75,19 @@ export function AuthProvider({ children }) {
     setAccessToken(null)
     setUser(null)
     localStorage.removeItem('ymmo_user')
+    localStorage.removeItem('ymmo_access_token')
   }
 
+  const updateUser = useCallback((patch) => {
+    setUser((current) => {
+      const next = { ...current, ...patch }
+      localStorage.setItem('ymmo_user', JSON.stringify(next))
+      return next
+    })
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout }}>
+    <AuthContext.Provider value={{ user, login, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   )

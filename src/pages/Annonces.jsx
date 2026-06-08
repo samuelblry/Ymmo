@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import { allListings } from '../data/listings'
 import { apiFetch } from '../lib/api'
 import { mapListing } from '../lib/dataMappers'
@@ -53,7 +54,7 @@ function Check({ checked, onChange, label }) {
   )
 }
 
-function ListingCard({ item }) {
+function ListingCard({ item, isFavorite, onToggleFavorite }) {
   return (
     <article className="overflow-hidden rounded-2xl border border-gris-moyen/40 bg-blanc shadow-sm">
       <Link to={`/annonces/${item.id}`} className="block">
@@ -61,9 +62,14 @@ function ListingCard({ item }) {
           <img src={item.image} alt={item.title} className="aspect-[16/10] w-full object-cover" />
           <button
             type="button"
-            aria-label="Ajouter aux favoris"
-            onClick={(e) => e.preventDefault()}
-            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-blanc/90 text-noir transition hover:text-marron"
+            aria-label={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+            onClick={(e) => {
+              e.preventDefault()
+              onToggleFavorite(item.id)
+            }}
+            className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-blanc/90 transition hover:text-marron ${
+              isFavorite ? 'text-marron' : 'text-noir'
+            }`}
           >
             <HeartIcon className="h-4 w-4" />
           </button>
@@ -93,6 +99,8 @@ function ListingCard({ item }) {
 }
 
 export default function Annonces() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const [type, setType] = useState('')
   const [piece, setPiece] = useState('')
   const [city, setCity] = useState('')
@@ -106,6 +114,7 @@ export default function Annonces() {
   const [listings, setListings] = useState(allListings)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [favoriteIds, setFavoriteIds] = useState([])
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
@@ -143,6 +152,39 @@ export default function Annonces() {
       ignore = true
     }
   }, [queryString])
+
+  useEffect(() => {
+    if (user?.type !== 'user') {
+      setFavoriteIds([])
+      return
+    }
+    let ignore = false
+    apiFetch('/api/favoris/biens')
+      .then((data) => {
+        if (!ignore) setFavoriteIds(data.map((item) => item.id_bien))
+      })
+      .catch(() => {
+        if (!ignore) setFavoriteIds([])
+      })
+    return () => {
+      ignore = true
+    }
+  }, [user])
+
+  const toggleFavorite = async (id) => {
+    if (user?.type !== 'user') {
+      navigate('/login')
+      return
+    }
+    const isFavorite = favoriteIds.includes(id)
+    setFavoriteIds((cur) => (isFavorite ? cur.filter((item) => item !== id) : [...cur, id]))
+    try {
+      await apiFetch(`/api/favoris/biens/${id}`, { method: isFavorite ? 'DELETE' : 'POST' })
+    } catch (err) {
+      setFavoriteIds((cur) => (isFavorite ? [...cur, id] : cur.filter((item) => item !== id)))
+      setError(err.message)
+    }
+  }
 
   const toggleExtra = (e) =>
     setSelectedExtras((cur) => (cur.includes(e) ? cur.filter((x) => x !== e) : [...cur, e]))
@@ -326,7 +368,12 @@ export default function Annonces() {
           ) : (
           <div className="mt-6 grid gap-6 sm:grid-cols-2">
             {visibleListings.map((item) => (
-              <ListingCard key={item.id} item={item} />
+              <ListingCard
+                key={item.id}
+                item={item}
+                isFavorite={favoriteIds.includes(item.id)}
+                onToggleFavorite={toggleFavorite}
+              />
             ))}
           </div>
           )}

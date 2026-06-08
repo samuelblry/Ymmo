@@ -7,7 +7,7 @@ from app.dependencies import get_current_user, require_roles
 from app.models.employe import Employe, Role
 from app.models.user import User
 from app.schemas.employe import EmployeCreate, EmployeRead, EmployeUpdate, RoleRead
-from app.schemas.user import CurrentUser, UserRead
+from app.schemas.user import CurrentUser, UserRead, UserUpdate
 from app.services.auth_service import hash_password
 
 router = APIRouter(tags=["Comptes"])
@@ -20,6 +20,35 @@ def me(current: CurrentUser = Depends(get_current_user), db: Session = Depends(g
     user = db.get(User, current.id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte introuvable")
+    return user
+
+
+@router.put("/api/users/me", response_model=UserRead)
+def update_me(
+    payload: UserUpdate,
+    current: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    if current.type != "user":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Compte client requis")
+    user = db.get(User, current.id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte introuvable")
+
+    data = payload.model_dump(exclude_unset=True)
+    if "email" in data and data["email"] != user.email:
+        exists = db.scalar(select(User).where(User.email == data["email"], User.id_user != user.id_user))
+        if exists:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email deja utilise")
+
+    password = data.pop("password", None)
+    for field, value in data.items():
+        setattr(user, field, value)
+    if password:
+        user.password_hash = hash_password(password)
+
+    db.commit()
+    db.refresh(user)
     return user
 
 

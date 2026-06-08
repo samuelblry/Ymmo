@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Reveal, Stagger, StaggerItem } from '../components/ui/Reveal'
 import { HeartIcon, BedIcon, BathIcon, AreaIcon } from '../components/ui/icons'
+import { apiFetch } from '../lib/api'
+import { mapListing } from '../lib/dataMappers'
 
 /* ── icônes ── */
 const UserIcon = (p) => (
@@ -42,12 +44,6 @@ const EditIcon = (p) => (
 )
 
 /* ── données mock ── */
-const mockFavoris = [
-  { id: 1, title: 'Villa moderne avec piscine', price: 620000, address: 'Aix-en-Provence, 13100', area: 180, beds: 5, baths: 2, image: '/img/listing-1.png', type: 'Maison' },
-  { id: 2, title: 'Appartement T4 vue mer', price: 385000, address: 'Marseille, 13008', area: 94, beds: 4, baths: 1, image: '/img/listing-2.png', type: 'Appartement' },
-  { id: 3, title: 'Maison de village avec jardin', price: 295000, address: 'Aix-en-Provence, 13090', area: 120, beds: 3, baths: 2, image: '/img/listing-1.png', type: 'Maison' },
-]
-
 const mockRecherches = [
   { id: 1, label: 'Appartements à Lyon', details: '2–4 pièces · max 300 000 €', date: 'Il y a 2 jours', count: 18 },
   { id: 2, label: 'Maisons à Bordeaux', details: '4+ pièces · max 500 000 €', date: 'Il y a 1 semaine', count: 7 },
@@ -57,17 +53,20 @@ const mockAlertes = []
 
 const euro = (n) => new Intl.NumberFormat('fr-FR').format(n) + ' €'
 
-const TABS = [
-  { id: 'profil', label: 'Profil', icon: UserIcon, count: null },
-  { id: 'favoris', label: 'Favoris', icon: HeartIcon, count: mockFavoris.length },
-  { id: 'recherches', label: 'Recherches', icon: SearchIcon, count: mockRecherches.length },
-  { id: 'alertes', label: 'Alertes', icon: BellIcon, count: mockAlertes.length },
-]
-
 /* ── sous-composants ── */
-function FavorisTab() {
-  const [favoris, setFavoris] = useState(mockFavoris)
-  const remove = (id) => setFavoris((f) => f.filter((x) => x.id !== id))
+function FavorisTab({ favoris, setFavoris }) {
+  const [error, setError] = useState('')
+  const remove = async (id) => {
+    const previous = favoris
+    setFavoris((f) => f.filter((x) => x.id !== id))
+    setError('')
+    try {
+      await apiFetch(`/api/favoris/biens/${id}`, { method: 'DELETE' })
+    } catch (err) {
+      setFavoris(previous)
+      setError(err.message)
+    }
+  }
 
   if (favoris.length === 0)
     return (
@@ -82,6 +81,11 @@ function FavorisTab() {
 
   return (
     <Stagger className="grid gap-4 sm:grid-cols-2">
+      {error && (
+        <p className="sm:col-span-2 rounded-xl bg-marron-clair px-4 py-3 text-sm text-marron-fonce">
+          {error}
+        </p>
+      )}
       {favoris.map((item) => (
         <StaggerItem key={item.id}>
           <article className="group relative overflow-hidden rounded-2xl border border-gris-moyen/40 bg-blanc transition-shadow hover:shadow-md">
@@ -189,9 +193,17 @@ function AlertesTab() {
   )
 }
 
-function ProfilTab({ user }) {
+function ProfilTab({ user, onProfileSaved }) {
   const [edit, setEdit] = useState(false)
-  const [form, setForm] = useState({ firstName: user.firstName, lastName: user.lastName, email: user.email })
+  const [form, setForm] = useState({
+    firstName: user.firstName ?? '',
+    lastName: user.lastName ?? '',
+    email: user.email ?? '',
+    telephone: user.telephone ?? '',
+    password: '',
+  })
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
   const change = (e) => setForm({ ...form, [e.target.name]: e.target.value })
 
   const fields = [
@@ -199,6 +211,50 @@ function ProfilTab({ user }) {
     { name: 'lastName', label: 'Nom', type: 'text' },
     { name: 'email', label: 'Adresse e-mail', type: 'email' },
   ]
+
+  const profileFields = [...fields, { name: 'telephone', label: 'Telephone', type: 'tel' }]
+
+  useEffect(() => {
+    setForm((current) => ({
+      ...current,
+      firstName: user.firstName ?? '',
+      lastName: user.lastName ?? '',
+      email: user.email ?? '',
+      telephone: user.telephone ?? '',
+    }))
+  }, [user])
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setError('')
+    setSaving(true)
+    try {
+      const updated = await apiFetch('/api/users/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prenom: form.firstName,
+          nom: form.lastName,
+          email: form.email,
+          telephone: form.telephone || null,
+          ...(form.password ? { password: form.password } : {}),
+        }),
+      })
+      const patch = {
+        firstName: updated.prenom,
+        lastName: updated.nom,
+        email: updated.email,
+        telephone: updated.telephone ?? '',
+      }
+      onProfileSaved(patch)
+      setForm((current) => ({ ...current, ...patch, password: '' }))
+      setEdit(false)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <Reveal className="rounded-2xl border border-gris-moyen/40 bg-blanc p-6">
@@ -215,8 +271,13 @@ function ProfilTab({ user }) {
       </div>
 
       {edit ? (
-        <form onSubmit={(e) => { e.preventDefault(); setEdit(false) }} className="mt-5 space-y-4">
-          {fields.map(({ name, label, type }) => (
+        <form onSubmit={submit} className="mt-5 space-y-4">
+          {error && (
+            <p className="rounded-xl bg-marron-clair px-4 py-3 text-sm text-marron-fonce">
+              {error}
+            </p>
+          )}
+          {profileFields.map(({ name, label, type }) => (
             <div key={name}>
               <label className="block text-xs font-medium uppercase tracking-widest text-gris-fonce">{label}</label>
               <input
@@ -231,13 +292,16 @@ function ProfilTab({ user }) {
           <div>
             <label className="block text-xs font-medium uppercase tracking-widest text-gris-fonce">Nouveau mot de passe</label>
             <input
+              name="password"
               type="password"
+              value={form.password}
+              onChange={change}
               placeholder="Laisser vide pour ne pas changer"
               className="mt-1.5 w-full rounded-xl border border-gris-moyen bg-gris-clair px-4 py-2.5 text-sm text-noir placeholder:text-gris-fonce/50 focus:border-marron focus:outline-none focus:ring-2 focus:ring-marron/20"
             />
           </div>
-          <button type="submit" className="mt-2 rounded-full bg-marron px-6 py-2.5 text-sm font-semibold text-blanc transition-opacity hover:opacity-90">
-            Enregistrer
+          <button type="submit" disabled={saving} className="mt-2 rounded-full bg-marron px-6 py-2.5 text-sm font-semibold text-blanc transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
+            {saving ? 'Enregistrement...' : 'Enregistrer'}
           </button>
         </form>
       ) : (
@@ -246,6 +310,7 @@ function ProfilTab({ user }) {
             { label: 'Prénom', value: form.firstName },
             { label: 'Nom', value: form.lastName },
             { label: 'E-mail', value: form.email },
+            { label: 'Telephone', value: form.telephone || 'Non renseigne' },
             { label: 'Mot de passe', value: '••••••••' },
           ].map(({ label, value }) => (
             <div key={label} className="rounded-xl bg-gris-clair px-4 py-3">
@@ -290,18 +355,52 @@ function EmptyState({ icon: Icon, title, text, cta, to }) {
 
 /* ── page principale ── */
 export default function Compte() {
-  const { user, logout } = useAuth()
+  const { user, logout, updateUser } = useAuth()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('profil')
+  const [favoris, setFavoris] = useState([])
 
   const handleLogout = () => { logout(); navigate('/') }
   const initials = `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase()
 
+  useEffect(() => {
+    let ignore = false
+    Promise.allSettled([
+      apiFetch('/api/users/me'),
+      apiFetch('/api/favoris/biens'),
+    ]).then(([profileResult, favorisResult]) => {
+      if (ignore) return
+      if (profileResult.status === 'fulfilled') {
+        updateUser({
+          firstName: profileResult.value.prenom,
+          lastName: profileResult.value.nom,
+          email: profileResult.value.email,
+          telephone: profileResult.value.telephone ?? '',
+        })
+      }
+      if (favorisResult.status === 'fulfilled') {
+        setFavoris(favorisResult.value.map(mapListing))
+      } else {
+        setFavoris([])
+      }
+      })
+    return () => {
+      ignore = true
+    }
+  }, [updateUser])
+
+  const tabs = [
+    { id: 'profil', label: 'Profil', icon: UserIcon, count: null },
+    { id: 'favoris', label: 'Favoris', icon: HeartIcon, count: favoris.length },
+    { id: 'recherches', label: 'Recherches', icon: SearchIcon, count: mockRecherches.length },
+    { id: 'alertes', label: 'Alertes', icon: BellIcon, count: mockAlertes.length },
+  ]
+
   const tabContent = {
-    favoris: <FavorisTab />,
+    favoris: <FavorisTab favoris={favoris} setFavoris={setFavoris} />,
     recherches: <RecherchesTab />,
     alertes: <AlertesTab />,
-    profil: <ProfilTab user={user} />,
+    profil: <ProfilTab user={user} onProfileSaved={updateUser} />,
   }
 
   return (
@@ -335,7 +434,7 @@ export default function Compte() {
           {/* Stats */}
           <div className="mt-8 grid grid-cols-3 gap-4 border-t border-gris-moyen/40 pt-8">
             {[
-              { label: 'Favoris', value: mockFavoris.length },
+              { label: 'Favoris', value: favoris.length },
               { label: 'Recherches', value: mockRecherches.length },
               { label: 'Alertes actives', value: mockAlertes.length },
             ].map(({ label, value }) => (
@@ -350,7 +449,7 @@ export default function Compte() {
         {/* Tabs */}
         <div className="mx-auto max-w-7xl px-6">
           <nav className="flex gap-1 border-t border-gris-moyen/40">
-            {TABS.map(({ id, label, icon: Icon, count }) => (
+            {tabs.map(({ id, label, icon: Icon, count }) => (
               <button
                 key={id}
                 type="button"

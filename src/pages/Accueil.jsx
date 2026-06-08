@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Reveal, Stagger, StaggerItem } from '../components/ui/Reveal'
 import {
   SearchIcon,
@@ -10,6 +11,9 @@ import {
 } from '../components/ui/icons'
 import { latestListings, popularListings } from '../data/listings'
 import { articles as blogArticles } from '../data/articles'
+import { useAuth } from '../context/AuthContext'
+import { apiFetch } from '../lib/api'
+import { mapArticle, mapListing } from '../lib/dataMappers'
 
 const euro = (n) => `${new Intl.NumberFormat('fr-FR').format(n)}€`
 
@@ -21,9 +25,7 @@ const CategoryAptIcon = () => <svg {...iconBase}><rect x="4" y="3" width="16" he
 const CategoryLandIcon = () => <svg {...iconBase}><path d="M3 20h18" /><path d="m5 20 4-12 4 6 3-4 3 10" /></svg>
 const CategoryShopIcon = () => <svg {...iconBase}><path d="M3 9V7l2-4h14l2 4v2a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0Z" /><path d="M5 11v9h14v-9" /><path d="M10 20v-5h4v5" /></svg>
 
-const articles = blogArticles.slice(0, 3)
-
-function ListingCard({ item }) {
+function ListingCard({ item, isFavorite, onToggleFavorite }) {
   return (
     <Link to={`/annonces/${item.id}`} className="block overflow-hidden rounded-2xl border border-gris-moyen/40 bg-blanc shadow-sm transition hover:shadow-md">
       <article>
@@ -35,9 +37,14 @@ function ListingCard({ item }) {
           />
           <button
             type="button"
-            aria-label="Ajouter aux favoris"
-            onClick={(e) => e.preventDefault()}
-            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-blanc/90 text-noir transition-colors hover:text-marron"
+            aria-label={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+            onClick={(e) => {
+              e.preventDefault()
+              onToggleFavorite(item.id)
+            }}
+            className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-blanc/90 transition-colors hover:text-marron ${
+              isFavorite ? 'text-marron' : 'text-noir'
+            }`}
           >
             <HeartIcon className="h-4 w-4" />
           </button>
@@ -67,6 +74,66 @@ function ListingCard({ item }) {
 }
 
 export default function Accueil() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const [homeListings, setHomeListings] = useState([...latestListings, ...popularListings])
+  const [homeArticles, setHomeArticles] = useState(blogArticles.slice(0, 3))
+  const [favoriteIds, setFavoriteIds] = useState([])
+
+  useEffect(() => {
+    let ignore = false
+    Promise.allSettled([
+      apiFetch('/api/biens'),
+      apiFetch('/api/articles'),
+    ]).then(([biensResult, articlesResult]) => {
+        if (ignore) return
+        if (biensResult.status === 'fulfilled') {
+          setHomeListings(biensResult.value.map(mapListing))
+        }
+        if (articlesResult.status === 'fulfilled') {
+          setHomeArticles(articlesResult.value.slice(0, 3).map(mapArticle))
+        }
+      })
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (user?.type !== 'user') {
+      setFavoriteIds([])
+      return
+    }
+    let ignore = false
+    apiFetch('/api/favoris/biens')
+      .then((data) => {
+        if (!ignore) setFavoriteIds(data.map((item) => item.id_bien))
+      })
+      .catch(() => {
+        if (!ignore) setFavoriteIds([])
+      })
+    return () => {
+      ignore = true
+    }
+  }, [user])
+
+  const toggleFavorite = async (id) => {
+    if (user?.type !== 'user') {
+      navigate('/login')
+      return
+    }
+    const isFavorite = favoriteIds.includes(id)
+    setFavoriteIds((cur) => (isFavorite ? cur.filter((item) => item !== id) : [...cur, id]))
+    try {
+      await apiFetch(`/api/favoris/biens/${id}`, { method: isFavorite ? 'DELETE' : 'POST' })
+    } catch {
+      setFavoriteIds((cur) => (isFavorite ? [...cur, id] : cur.filter((item) => item !== id)))
+    }
+  }
+
+  const latestHomeListings = homeListings.slice(0, 3)
+  const popularHomeListings = homeListings.slice(3, 6)
+
   return (
     <div className="pb-8">
       {/* Hero */}
@@ -173,9 +240,13 @@ export default function Accueil() {
           </p>
         </Reveal>
         <Stagger className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {latestListings.map((item, i) => (
+          {latestHomeListings.map((item, i) => (
             <StaggerItem key={i}>
-              <ListingCard item={item} />
+              <ListingCard
+                item={item}
+                isFavorite={favoriteIds.includes(item.id)}
+                onToggleFavorite={toggleFavorite}
+              />
             </StaggerItem>
           ))}
         </Stagger>
@@ -192,9 +263,13 @@ export default function Accueil() {
           </p>
         </Reveal>
         <Stagger className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {popularListings.map((item, i) => (
+          {popularHomeListings.map((item, i) => (
             <StaggerItem key={i}>
-              <ListingCard item={item} />
+              <ListingCard
+                item={item}
+                isFavorite={favoriteIds.includes(item.id)}
+                onToggleFavorite={toggleFavorite}
+              />
             </StaggerItem>
           ))}
         </Stagger>
@@ -306,7 +381,7 @@ export default function Accueil() {
           </p>
         </Reveal>
         <Stagger className="mt-8 grid gap-6 md:grid-cols-3">
-          {articles.map((a) => (
+          {homeArticles.map((a) => (
             <StaggerItem key={a.id}>
               <Link to={`/blog/${a.id}`} className="group relative block h-72 overflow-hidden rounded-2xl">
                 <img

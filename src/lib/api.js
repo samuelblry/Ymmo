@@ -1,9 +1,14 @@
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
-let accessToken = null
+let accessToken = localStorage.getItem('ymmo_access_token')
 
 export const setAccessToken = (token) => {
   accessToken = token
+  if (token) {
+    localStorage.setItem('ymmo_access_token', token)
+  } else {
+    localStorage.removeItem('ymmo_access_token')
+  }
 }
 
 const buildHeaders = (headers = {}) => {

@@ -60,7 +60,7 @@ def get_bien(id_bien: int, db: Session = Depends(get_db)) -> Bien:
     if not bien:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bien introuvable")
     if not bien.stats:
-        bien.stats = StatsBien()
+        bien.stats = StatsBien(nb_vues=0, nb_clicks=0, nb_likes=0, score_popularite=0)
     bien.stats.nb_vues += 1
     bien.stats.last_update = datetime.utcnow()
     db.commit()
@@ -91,6 +91,7 @@ def create_bien(
     if payload.id_agence != current.agence_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Commercial limite a son agence")
     bien = Bien(**payload.model_dump(), id_commercial=current.id)
+    bien.stats = StatsBien(nb_vues=0, nb_clicks=0, nb_likes=0, score_popularite=0)
     db.add(bien)
     db.commit()
     db.refresh(bien)

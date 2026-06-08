@@ -54,6 +54,8 @@ const mapEmploye = (employe, roles, agences) => {
     email: employe.email,
     telephone: employe.telephone,
     id_role: role?.nom_role ?? 'Commercial',
+    roleId: employe.id_role,
+    agenceId: employe.id_agence,
     id_agence: agence?.ville ?? 'Siège',
     actif: employe.actif,
   }
@@ -153,21 +155,63 @@ function Overview({ employes }) {
   )
 }
 
-function Employes({ employes, setEmployes }) {
+function Employes({ employes, setEmployes, roles, agences }) {
   const [modal,    setModal]    = useState(null)
   const [search,   setSearch]   = useState('')
   const [roleF,    setRoleF]    = useState('')
+  const reportError = (message) => window.alert(message)
 
-  const handleSave = (data) => {
-    if (modal === 'create') {
-      setEmployes(prev => [...prev, { ...data, id: Date.now() }])
-    } else {
-      setEmployes(prev => prev.map(e => e.id === modal.id ? { ...e, ...data } : e))
+  const agencesForMap = agences.map((item) => ({ id_agence: item.id, ville: item.ville }))
+
+  const toPayload = (data, includeEmail = false) => {
+    const role = roles.find((item) => item.nom_role === data.id_role)
+    const agence = agences.find((item) => item.ville === data.id_agence)
+    return {
+      nom: data.nom,
+      prenom: data.prenom,
+      telephone: data.telephone || null,
+      id_role: role?.id_role ?? data.roleId ?? 1,
+      id_agence: agence?.id ?? data.agenceId ?? null,
+      ...(includeEmail ? { email: data.email, password: 'Ymmo2026!' } : {}),
     }
-    setModal(null)
   }
 
-  const toggleActif = (id) => setEmployes(prev => prev.map(e => e.id === id ? { ...e, actif: !e.actif } : e))
+  const handleSave = async (data) => {
+    try {
+      const saved = modal === 'create'
+        ? await apiFetch('/api/employes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(toPayload(data, true)),
+          })
+        : await apiFetch(`/api/employes/${modal.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(toPayload(data)),
+          })
+      const mapped = mapEmploye(saved, roles, agencesForMap)
+      setEmployes((prev) => modal === 'create'
+        ? [...prev, mapped]
+        : prev.map((e) => (e.id === modal.id ? mapped : e)))
+      setModal(null)
+    } catch (err) {
+      reportError(err.message)
+    }
+  }
+
+  const toggleActif = async (id) => {
+    const employe = employes.find((item) => item.id === id)
+    if (!employe) return
+    try {
+      const updated = await apiFetch(`/api/admin/employes/${id}/${employe.actif ? 'disable' : 'activate'}`, {
+        method: 'PUT',
+      })
+      const mapped = mapEmploye(updated, roles, agencesForMap)
+      setEmployes((prev) => prev.map((e) => (e.id === id ? mapped : e)))
+    } catch (err) {
+      reportError(err.message)
+    }
+  }
 
   const filtered = employes.filter(e => {
     const q = search.toLowerCase()
@@ -322,6 +366,7 @@ export default function DashboardRH() {
   const [activeTab, setActiveTab] = useState('overview')
   const [employes,  setEmployes]  = useState(INIT_EMPLOYES)
   const [agences, setAgences] = useState(AGENCES_DETAIL)
+  const [roles, setRoles] = useState(ROLES.map((nom_role, index) => ({ id_role: index + 1, nom_role })))
 
   useEffect(() => {
     let ignore = false
@@ -333,6 +378,9 @@ export default function DashboardRH() {
       if (ignore) return
       const roles = rolesResult.status === 'fulfilled' ? rolesResult.value : []
       const apiAgences = agencesResult.status === 'fulfilled' ? agencesResult.value : []
+      if (rolesResult.status === 'fulfilled') {
+        setRoles(roles)
+      }
       if (agencesResult.status === 'fulfilled') {
         setAgences(apiAgences.map(mapAgence))
       }
@@ -348,7 +396,7 @@ export default function DashboardRH() {
   return (
     <DashboardLayout roleLabel="RH / Juridique" tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab}>
       {activeTab === 'overview' && <Overview employes={employes} />}
-      {activeTab === 'employes' && <Employes employes={employes} setEmployes={setEmployes} />}
+      {activeTab === 'employes' && <Employes employes={employes} setEmployes={setEmployes} roles={roles} agences={agences} />}
       {activeTab === 'agences'  && <Agences  employes={employes} agences={agences} />}
     </DashboardLayout>
   )

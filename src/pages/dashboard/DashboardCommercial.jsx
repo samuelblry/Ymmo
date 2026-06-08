@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import DashboardLayout, { KpiCard, Modal, SectionHeader } from '../../components/ui/DashboardLayout'
 import { apiFetch } from '../../lib/api'
 import { mapListing } from '../../lib/dataMappers'
@@ -182,8 +183,10 @@ function toBienPayload(data) {
 function Annonces({ biens, setBiens }) {
   const [modal, setModal]     = useState(null)
   const [deleteId, setDeleteId] = useState(null)
+  const [saveError, setSaveError] = useState('')
 
   const handleSave = async (data) => {
+    setSaveError('')
     if (modal === 'create') {
       try {
         const created = await apiFetch('/api/biens', {
@@ -192,8 +195,9 @@ function Annonces({ biens, setBiens }) {
           body: JSON.stringify(toBienPayload(data)),
         })
         setBiens(prev => [...prev, mapDashboardBien(created)])
-      } catch {
-        setBiens(prev => [...prev, { ...data, id: Date.now(), vues: 0, contacts: 0, likes: 0, date_ajout: new Date().toISOString().slice(0, 10), image: '/img/listing-1.png' }])
+      } catch (err) {
+        setSaveError(err.message)
+        return
       }
     } else {
       try {
@@ -203,8 +207,9 @@ function Annonces({ biens, setBiens }) {
           body: JSON.stringify(toBienPayload({ ...modal, ...data })),
         })
         setBiens(prev => prev.map(b => b.id === modal.id ? mapDashboardBien(updated) : b))
-      } catch {
-        setBiens(prev => prev.map(b => b.id === modal.id ? { ...b, ...data } : b))
+      } catch (err) {
+        setSaveError(err.message)
+        return
       }
     }
     setModal(null)
@@ -277,6 +282,9 @@ function Annonces({ biens, setBiens }) {
                       <button onClick={() => setModal(b)} className="rounded-lg p-1.5 text-gris-fonce transition hover:bg-marron-clair hover:text-marron" aria-label="Modifier">
                         <EditIcon className="h-4 w-4" />
                       </button>
+                      <Link to={`/annonces/${b.id}`} className="rounded-lg p-1.5 text-gris-fonce transition hover:bg-marron-clair hover:text-marron" aria-label="Voir">
+                        <EyeIcon className="h-4 w-4" />
+                      </Link>
                       <button onClick={() => setDeleteId(b.id)} className="rounded-lg p-1.5 text-gris-fonce transition hover:bg-gris-clair hover:text-noir" aria-label="Supprimer">
                         <TrashIcon className="h-4 w-4" />
                       </button>
@@ -291,6 +299,11 @@ function Annonces({ biens, setBiens }) {
 
       {modal && (
         <Modal title={modal === 'create' ? 'Nouvelle annonce' : "Modifier l'annonce"} onClose={() => setModal(null)}>
+          {saveError && (
+            <p className="mb-4 rounded-xl bg-marron-clair px-4 py-3 text-sm text-marron-fonce">
+              {saveError}
+            </p>
+          )}
           <BienForm initial={modal === 'create' ? null : modal} onSave={handleSave} onCancel={() => setModal(null)} />
         </Modal>
       )}

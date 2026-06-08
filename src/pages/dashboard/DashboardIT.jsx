@@ -92,7 +92,7 @@ function Overview({ comptes, logs }) {
       <div className="mt-8 rounded-2xl border border-gris-moyen/40 bg-blanc p-6 shadow-sm">
         <h2 className="mb-4 text-lg font-bold text-noir">Activité récente</h2>
         <div className="space-y-2">
-          {INIT_LOGS.slice(0, 5).map(l => (
+          {logs.slice(0, 5).map(l => (
             <div key={l.id} className="flex items-center gap-4 rounded-xl bg-gris-clair/50 px-4 py-3">
               <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${ACTION_CLS[l.action]}`}>
                 {ACTION_LABELS[l.action]}
@@ -114,9 +114,27 @@ function Comptes({ comptes, setComptes }) {
   const [tokenModal, setTokenModal] = useState(null)
   const [search,     setSearch]     = useState('')
 
-  const toggleActif  = (id) => setComptes(prev => prev.map(c => c.id === id ? { ...c, actif: !c.actif } : c))
-  const resetMFA     = (id) => setComptes(prev => prev.map(c => c.id === id ? { ...c, mfa_enabled: false } : c))
-  const resetMDP     = (employe) => setTokenModal({ employe, token: genToken() })
+  const toggleActif = async (id) => {
+    const compte = comptes.find((item) => item.id === id)
+    if (!compte) return
+    const updated = await apiFetch(`/api/admin/employes/${id}/${compte.actif ? 'disable' : 'activate'}`, {
+      method: 'PUT',
+    })
+    setComptes((prev) => prev.map((c) => (c.id === id ? { ...c, actif: updated.actif } : c)))
+  }
+  const resetMFA = async (id) => {
+    await apiFetch(`/api/admin/employes/${id}/mfa-reset`, { method: 'POST' })
+    setComptes((prev) => prev.map((c) => (c.id === id ? { ...c, mfa_enabled: false } : c)))
+  }
+  const resetMDP = async (compte) => {
+    const token = genToken()
+    await apiFetch('/api/admin/reset-mdp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ employe_id: compte.id, temporary_password: token }),
+    })
+    setTokenModal({ employe: `${compte.prenom} ${compte.nom}`, token })
+  }
 
   const filtered = comptes.filter(c => {
     const q = search.toLowerCase()
@@ -178,7 +196,7 @@ function Comptes({ comptes, setComptes }) {
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-end gap-1.5">
                       <button
-                        onClick={() => resetMDP(`${c.prenom} ${c.nom}`)}
+                        onClick={() => resetMDP(c)}
                         title="Réinitialiser le mot de passe"
                         className="rounded-lg p-1.5 text-gris-fonce transition hover:bg-marron-clair hover:text-marron"
                         aria-label="Reset MDP"

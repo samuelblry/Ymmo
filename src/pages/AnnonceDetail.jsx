@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams, Navigate } from 'react-router-dom'
+import { Link, useParams, Navigate, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import { getListing, similarListings } from '../data/listings'
 import { apiFetch } from '../lib/api'
 import { mapListing } from '../lib/dataMappers'
@@ -64,12 +65,16 @@ function TerraceIcon(props) {
 
 export default function AnnonceDetail() {
   const { id } = useParams()
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const fallbackListing = useMemo(() => getListing(id), [id])
   const [listing, setListing] = useState(fallbackListing)
   const [loading, setLoading] = useState(true)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState('')
   const [index, setIndex] = useState(0)
+  const [form, setForm] = useState({ name: '', email: '', phone: '' })
+  const [isFavorite, setIsFavorite] = useState(false)
 
   useEffect(() => {
     let ignore = false
@@ -92,13 +97,46 @@ export default function AnnonceDetail() {
     }
   }, [fallbackListing, id])
 
+  useEffect(() => {
+    if (user?.type !== 'user') {
+      setIsFavorite(false)
+      return
+    }
+    let ignore = false
+    apiFetch('/api/favoris/biens')
+      .then((data) => {
+        if (!ignore) setIsFavorite(data.some((item) => item.id_bien === Number(id)))
+      })
+      .catch(() => {
+        if (!ignore) setIsFavorite(false)
+      })
+    return () => {
+      ignore = true
+    }
+  }, [id, user])
+
+  const toggleFavorite = async () => {
+    if (user?.type !== 'user') {
+      navigate('/login')
+      return
+    }
+    const next = !isFavorite
+    setIsFavorite(next)
+    setError('')
+    try {
+      await apiFetch(`/api/favoris/biens/${id}`, { method: next ? 'POST' : 'DELETE' })
+    } catch (err) {
+      setIsFavorite(!next)
+      setError(err.message)
+    }
+  }
+
   if (!loading && !listing) return <Navigate to="/annonces" replace />
   if (!listing) return null
   const images = listing.images
   const next = () => setIndex((i) => (i + 1) % images.length)
   const prev = () => setIndex((i) => (i - 1 + images.length) % images.length)
 
-  const [form, setForm] = useState({ name: '', email: '', phone: '' })
   const onSubmit = async (e) => {
     e.preventDefault()
     setError('')
@@ -151,8 +189,11 @@ export default function AnnonceDetail() {
           </button>
           <button
             type="button"
-            aria-label="Ajouter aux favoris"
-            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-blanc/90 text-noir shadow-md transition hover:text-marron"
+            aria-label={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+            onClick={toggleFavorite}
+            className={`absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-blanc/90 shadow-md transition hover:text-marron ${
+              isFavorite ? 'text-marron' : 'text-noir'
+            }`}
           >
             <HeartIcon className="h-5 w-5" />
           </button>

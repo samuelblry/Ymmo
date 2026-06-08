@@ -1,15 +1,31 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.dependencies import require_authenticated_user
 from app.models.article import Article
 from app.models.listing import Bien
 from app.models.social import FavoriArticle, FavoriBien
+from app.schemas.bien import BienPublic
 from app.schemas.user import CurrentUser
 
 router = APIRouter(prefix="/api/favoris", tags=["Favoris"])
+
+
+@router.get("/biens", response_model=list[BienPublic])
+def list_favoris_biens(
+    current: CurrentUser = Depends(require_authenticated_user),
+    db: Session = Depends(get_db),
+) -> list[Bien]:
+    stmt = (
+        select(Bien)
+        .join(FavoriBien, FavoriBien.id_bien == Bien.id_bien)
+        .options(selectinload(Bien.images))
+        .where(FavoriBien.id_user == current.id)
+        .order_by(FavoriBien.date_ajout.desc())
+    )
+    return list(db.scalars(stmt))
 
 
 @router.post("/biens/{id_bien}", status_code=status.HTTP_201_CREATED)
