@@ -72,36 +72,38 @@ export default function Accueil() {
       {/* Hero */}
       <section className="px-6 pt-6">
         <div className="relative mx-auto w-fit">
-          <img
-            src="/img/hero_cut.png"
-            alt="Maison moderne au crépuscule"
-            className="block max-h-[460px] w-auto select-none"
-          />
+          <div className="relative">
+            <img
+              src="/img/hero_cut.png"
+              alt="Maison moderne au crépuscule"
+              className="block max-h-[460px] w-auto select-none"
+            />
 
-          <div className="pointer-events-none absolute bottom-0 left-0 h-2/3 w-[45%] bg-gradient-to-tr from-noir/55 via-noir/20 to-transparent" />
+            <div className="pointer-events-none absolute bottom-0 left-0 h-2/3 w-[45%] bg-gradient-to-tr from-noir/55 via-noir/20 to-transparent" />
 
-          <div className="absolute left-[4%] top-[50%] -translate-y-1/2 pr-6">
-            <h1 className="text-3xl font-bold leading-[1.05] text-blanc drop-shadow-md sm:text-4xl md:text-5xl lg:text-6xl">
-              Trouvez le bien qui vous
-              <br />
-              correspond
-            </h1>
+            <div className="absolute left-[4%] top-[50%] -translate-y-1/2 pr-6">
+              <h1 className="text-3xl font-bold leading-[1.05] text-blanc drop-shadow-md sm:text-4xl md:text-5xl lg:text-6xl">
+                Trouvez le bien qui vous
+                <br />
+                correspond
+              </h1>
+            </div>
           </div>
 
-          <div className="relative mt-4 flex items-center gap-3 rounded-full bg-blanc p-2 pl-6 shadow-lg md:absolute md:bottom-[3%] md:right-[1.5%] md:mt-0 md:w-[48%]">
+          <div className="relative mt-4 flex items-center gap-3 rounded-full bg-blanc p-2 pl-6 shadow-lg md:absolute md:bottom-[-3%] md:right-[1.5%] md:mt-0 md:w-[48%]">
             <SearchIcon className="h-5 w-5 shrink-0 text-gris-fonce" />
             <input
               type="text"
               placeholder="Ville, type de bien, budget..."
               className="flex-1 bg-transparent text-sm text-noir placeholder:text-gris-fonce focus:outline-none"
             />
-            <button
-              type="button"
-              aria-label="Filtrer"
+            <Link
+              to="/annonces"
+              aria-label="Voir tous les biens"
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-marron text-blanc transition-opacity hover:opacity-90"
             >
               <SlidersIcon className="h-5 w-5" />
-            </button>
+            </Link>
           </div>
         </div>
       </section>
@@ -110,14 +112,14 @@ export default function Accueil() {
       <section className="mx-auto max-w-7xl px-6 py-12">
         <Stagger className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {[
-            { label: 'Maisons', count: '+ 240 biens', icon: <CategoryHouseIcon /> },
-            { label: 'Appartements', count: '+ 180 biens', icon: <CategoryAptIcon /> },
-            { label: 'Terrains', count: '+ 60 biens', icon: <CategoryLandIcon /> },
-            { label: 'Locaux pro', count: '+ 35 biens', icon: <CategoryShopIcon /> },
+            { label: 'Maisons', count: '+ 240 biens', icon: <CategoryHouseIcon />, type: 'Maison' },
+            { label: 'Appartements', count: '+ 180 biens', icon: <CategoryAptIcon />, type: 'Appartement' },
+            { label: 'Terrains', count: '+ 60 biens', icon: <CategoryLandIcon />, type: 'Terrain' },
+            { label: 'Locaux pro', count: '+ 35 biens', icon: <CategoryShopIcon />, type: '' },
           ].map((c, i) => (
             <StaggerItem key={i}>
               <Link
-                to="/annonces"
+                to={c.type ? `/annonces?type=${c.type}` : '/annonces'}
                 className={`flex aspect-[4/3] flex-col items-center justify-center gap-3 rounded-2xl p-6 text-blanc transition hover:scale-[1.02] ${degrade}`}
               >
                 <span className="flex h-12 w-12 items-center justify-center rounded-full bg-blanc/20">
