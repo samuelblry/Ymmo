@@ -141,7 +141,7 @@ export default function Agences() {
       </section>
 
       {/* Filtres */}
-      <section className="mx-auto -mt-8 max-w-7xl px-6">
+      <section className="mx-auto -mt--5 max-w-7xl px-6">
         <div className="rounded-2xl border border-gris-moyen/50 bg-blanc p-4 shadow-sm">
           <div className="flex items-center gap-3 rounded-full border border-gris-moyen/50 bg-gris-clair px-5 py-3">
             <SearchIcon className="h-4 w-4 text-gris-fonce" />

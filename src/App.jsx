@@ -1,9 +1,17 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
+
+function ScrollToTop() {
+  const { pathname } = useLocation()
+  useEffect(() => { window.scrollTo(0, 0) }, [pathname])
+  return null
+}
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ui/ProtectedRoute'
 import Navbar from './components/ui/Navbar'
 import Footer from './components/ui/Footer'
 import Accueil from './pages/Accueil'
+import APropos from './pages/APropos'
 import Annonces from './pages/Annonces'
 import AnnonceDetail from './pages/AnnonceDetail'
 import Agences from './pages/Agences'
@@ -28,6 +36,7 @@ export default function App() {
   return (
     <AuthProvider>
       <div className="flex min-h-screen flex-col">
+        <ScrollToTop />
         <Navbar />
         <main className="flex-1">
           <Routes>
@@ -36,6 +45,7 @@ export default function App() {
             <Route path="/annonces/:id" element={<AnnonceDetail />} />
             <Route path="/agences" element={<Agences />} />
             <Route path="/agences/:id" element={<AgenceDetail />} />
+            <Route path="/a-propos" element={<APropos />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:id" element={<BlogArticle />} />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { allListings } from '../data/listings'
 import { apiFetch } from '../lib/api'
@@ -101,7 +101,8 @@ function ListingCard({ item, isFavorite, onToggleFavorite }) {
 export default function Annonces() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [type, setType] = useState('')
+  const [searchParams] = useSearchParams()
+  const [type, setType] = useState(() => searchParams.get('type') ?? '')
   const [piece, setPiece] = useState('')
   const [city, setCity] = useState('')
   const [priceMin, setPriceMin] = useState('')
@@ -218,7 +219,7 @@ export default function Annonces() {
         </p>
       </div>
 
-      <div className="mx-auto mt-10 grid max-w-7xl gap-8 px-6 lg:grid-cols-[280px_1fr]">
+      <div className="mx-auto mt-10 grid max-w-7xl grid-cols-1 gap-8 px-6 lg:grid-cols-[280px_1fr]">
         {/* Sidebar Filtres */}
         <aside className="self-start rounded-2xl border border-gris-moyen/50 bg-blanc p-6 shadow-sm">
           <h2 className="border-b border-gris-moyen/50 pb-3 text-lg font-bold text-noir">Filtres</h2>
@@ -344,7 +345,7 @@ export default function Annonces() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Ville, type de bien, budget..."
-              className="flex-1 bg-transparent text-sm text-noir placeholder:text-gris-fonce focus:outline-none"
+              className="min-w-0 flex-1 bg-transparent text-sm text-noir placeholder:text-gris-fonce focus:outline-none"
             />
             <span className="hidden text-sm text-gris-fonce sm:inline">Trier par :</span>
             <select className="cursor-pointer bg-transparent text-sm font-medium text-noir focus:outline-none">

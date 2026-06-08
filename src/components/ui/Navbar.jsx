@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 const links = [
@@ -11,11 +11,18 @@ const links = [
 ]
 
 export default function Navbar() {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const [open, setOpen] = useState(false)
+  const navigate = useNavigate()
 
   // close on navigation
   const close = () => setOpen(false)
+
+  const handleLogout = async () => {
+    close()
+    await logout()
+    navigate('/')
+  }
 
   return (
     <header className="sticky top-0 z-50 bg-gris-clair/80 backdrop-blur-md">
@@ -43,22 +50,40 @@ export default function Navbar() {
 
         <div className="flex items-center gap-3">
           {user ? (
-            <Link
-              to="/compte"
-              className="flex items-center gap-2 rounded-full bg-marron px-5 py-2 text-sm font-semibold text-blanc transition-opacity hover:opacity-90"
-            >
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blanc/20 text-xs font-bold">
-                {user.firstName?.[0]?.toUpperCase()}
-              </span>
-              <span className="hidden sm:inline">Mon compte</span>
-            </Link>
+            <>
+              {user.type === 'employe' && (
+                <Link
+                  to={user.dashboardPath}
+                  className="hidden rounded-full border border-marron px-5 py-2 text-sm font-semibold text-marron transition-colors hover:bg-marron hover:text-blanc sm:inline-flex"
+                >
+                  Dashboard
+                </Link>
+              )}
+              <Link
+                to="/compte"
+                className="flex items-center gap-2 rounded-full bg-marron px-5 py-2 text-sm font-semibold text-blanc transition-opacity hover:opacity-90"
+              >
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blanc/20 text-xs font-bold">
+                  {user.firstName?.[0]?.toUpperCase()}
+                </span>
+                <span className="hidden sm:inline">Mon compte</span>
+              </Link>
+            </>
           ) : (
-            <Link
-              to="/login"
-              className="rounded-full bg-marron px-5 py-2 text-sm font-semibold text-blanc transition-opacity hover:opacity-90"
-            >
-              Connexion
-            </Link>
+            <>
+              <Link
+                to="/register"
+                className="hidden rounded-full border border-marron px-5 py-2 text-sm font-semibold text-marron transition-colors hover:bg-marron hover:text-blanc sm:inline-flex"
+              >
+                Créer un compte
+              </Link>
+              <Link
+                to="/login"
+                className="rounded-full bg-marron px-5 py-2 text-sm font-semibold text-blanc transition-opacity hover:opacity-90"
+              >
+                Connexion
+              </Link>
+            </>
           )}
 
           {/* Burger — mobile only */}
@@ -94,6 +119,63 @@ export default function Navbar() {
                 </NavLink>
               </li>
             ))}
+
+            <li className="my-2 border-t border-gris-moyen/40" />
+
+            {user ? (
+              <>
+                {user.type === 'employe' && (
+                  <li>
+                    <Link
+                      to={user.dashboardPath}
+                      onClick={close}
+                      className="block rounded-xl px-4 py-3 text-sm font-medium text-marron transition-colors hover:bg-marron-clair/60"
+                    >
+                      Dashboard
+                    </Link>
+                  </li>
+                )}
+                <li>
+                  <Link
+                    to="/compte"
+                    onClick={close}
+                    className="block rounded-xl px-4 py-3 text-sm font-medium text-gris-fonce transition-colors hover:bg-marron-clair/60 hover:text-noir"
+                  >
+                    Mon compte
+                  </Link>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="block w-full rounded-xl px-4 py-3 text-left text-sm font-medium text-gris-fonce transition-colors hover:bg-marron-clair/60 hover:text-noir"
+                  >
+                    Déconnexion
+                  </button>
+                </li>
+              </>
+            ) : (
+              <>
+                <li>
+                  <Link
+                    to="/login"
+                    onClick={close}
+                    className="block rounded-xl px-4 py-3 text-sm font-medium text-gris-fonce transition-colors hover:bg-marron-clair/60 hover:text-noir"
+                  >
+                    Connexion
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/register"
+                    onClick={close}
+                    className="block rounded-xl px-4 py-3 text-sm font-medium text-marron transition-colors hover:bg-marron-clair/60"
+                  >
+                    Créer un compte
+                  </Link>
+                </li>
+              </>
+            )}
           </ul>
         </div>
       )}

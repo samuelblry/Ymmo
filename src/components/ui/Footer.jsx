@@ -34,8 +34,8 @@ export default function Footer() {
     {
       title: 'Réseaux sociaux',
       links: [
-        ['Instagram', '#'],
-        ['LinkedIn', '#'],
+        ['Instagram', 'https://instagram.com'],
+        ['LinkedIn', 'https://linkedin.com'],
       ],
     },
   ]
@@ -80,12 +80,23 @@ export default function Footer() {
               <ul className="mt-4 space-y-3">
                 {col.links.map(([label, to]) => (
                   <li key={label}>
-                    <Link
-                      to={to}
-                      className="text-sm text-blanc/80 transition-colors hover:text-blanc"
-                    >
-                      {label}
-                    </Link>
+                    {to.startsWith('http') ? (
+                      <a
+                        href={to}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blanc/80 transition-colors hover:text-blanc"
+                      >
+                        {label}
+                      </a>
+                    ) : (
+                      <Link
+                        to={to}
+                        className="text-sm text-blanc/80 transition-colors hover:text-blanc"
+                      >
+                        {label}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
