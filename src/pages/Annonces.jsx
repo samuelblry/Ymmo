@@ -17,6 +17,18 @@ const euro = (n) => `${new Intl.NumberFormat('fr-FR').format(n)}€`
 const types = ['Maison', 'Appartement', 'Terrain']
 const pieces = ['1', '2', '3', '4+']
 const extras = ['Jardin', 'Terrasse', 'Balcon', 'Garage', 'Piscine', 'Ascenseur']
+const perPage = 6
+
+const normalizeSort = (value) => ({
+  'Prix croissant': 'prix_asc',
+  'Prix dÃ©croissant': 'prix_desc',
+  'Prix decroissant': 'prix_desc',
+  Surface: 'surface_desc',
+  'PopularitÃ©': 'recent',
+  Popularite: 'recent',
+  'Plus rÃ©cent': 'recent',
+  'Plus recent': 'recent',
+}[value] ?? value)
 
 function Radio({ checked, onChange, label }) {
   return (
@@ -110,8 +122,10 @@ export default function Annonces() {
   const [surfaceMin, setSurfaceMin] = useState('')
   const [surfaceMax, setSurfaceMax] = useState('')
   const [search, setSearch] = useState('')
+  const [appliedSearch, setAppliedSearch] = useState('')
   const [selectedExtras, setSelectedExtras] = useState([])
   const [page, setPage] = useState(1)
+  const [sort, setSort] = useState('recent')
   const [listings, setListings] = useState(allListings)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -119,6 +133,7 @@ export default function Annonces() {
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
+    if (appliedSearch) params.set('q', appliedSearch)
     if (type) params.set('type', type)
     if (city) params.set('ville', city)
     if (priceMin) params.set('prix_min', priceMin)
@@ -126,8 +141,10 @@ export default function Annonces() {
     if (surfaceMin) params.set('surface_min', surfaceMin)
     if (surfaceMax) params.set('surface_max', surfaceMax)
     if (piece) params.set('nb_pieces', piece.replace('+', ''))
+    selectedExtras.forEach((extra) => params.append('extras', extra))
+    if (sort) params.set('tri', sort)
     return params.toString()
-  }, [city, piece, priceMax, priceMin, surfaceMax, surfaceMin, type])
+  }, [appliedSearch, city, piece, priceMax, priceMin, selectedExtras, sort, surfaceMax, surfaceMin, type])
 
   useEffect(() => {
     let ignore = false
@@ -188,7 +205,15 @@ export default function Annonces() {
   }
 
   const toggleExtra = (e) =>
-    setSelectedExtras((cur) => (cur.includes(e) ? cur.filter((x) => x !== e) : [...cur, e]))
+    setSelectedExtras((cur) => {
+      setPage(1)
+      return cur.includes(e) ? cur.filter((x) => x !== e) : [...cur, e]
+    })
+
+  const applyFilters = () => {
+    setAppliedSearch(search.trim())
+    setPage(1)
+  }
 
   const reset = () => {
     setType('')
@@ -199,14 +224,15 @@ export default function Annonces() {
     setSurfaceMin('')
     setSurfaceMax('')
     setSearch('')
+    setAppliedSearch('')
     setSelectedExtras([])
+    setSort('recent')
+    setPage(1)
   }
 
-  const visibleListings = listings.filter((item) => {
-    if (!search) return true
-    const value = search.toLowerCase()
-    return [item.title, item.city, item.type, item.address].some((field) => field?.toLowerCase().includes(value))
-  })
+  const totalPages = Math.max(1, Math.ceil(listings.length / perPage))
+  const safePage = Math.min(page, totalPages)
+  const visibleListings = listings.slice((safePage - 1) * perPage, safePage * perPage)
 
   return (
     <div className="bg-gris-clair pb-20">
@@ -323,6 +349,7 @@ export default function Annonces() {
 
           <button
             type="button"
+            onClick={applyFilters}
             className="mt-5 w-full rounded-full bg-[linear-gradient(135deg,#C4A484_0%,#A88B6A_100%)] px-5 py-2.5 text-sm font-semibold text-blanc shadow-sm transition hover:opacity-90"
           >
             Appliquer
@@ -344,11 +371,20 @@ export default function Annonces() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') applyFilters()
+              }}
               placeholder="Ville, type de bien, budget..."
               className="min-w-0 flex-1 bg-transparent text-sm text-noir placeholder:text-gris-fonce focus:outline-none"
             />
             <span className="hidden text-sm text-gris-fonce sm:inline">Trier par :</span>
-            <select className="cursor-pointer bg-transparent text-sm font-medium text-noir focus:outline-none">
+            <select
+              onChange={(e) => {
+                setSort(normalizeSort(e.target.value))
+                setPage(1)
+              }}
+              className="cursor-pointer bg-transparent text-sm font-medium text-noir focus:outline-none"
+            >
               <option>Popularité</option>
               <option>Prix croissant</option>
               <option>Prix décroissant</option>
@@ -367,19 +403,31 @@ export default function Annonces() {
               Chargement des annonces...
             </p>
           ) : (
-          <div className="mt-6 grid gap-6 sm:grid-cols-2">
-            {visibleListings.map((item) => (
-              <ListingCard
-                key={item.id}
-                item={item}
-                isFavorite={favoriteIds.includes(item.id)}
-                onToggleFavorite={toggleFavorite}
-              />
-            ))}
-          </div>
+            <>
+              <p className="mt-5 text-sm text-gris-fonce">
+                {listings.length} bien{listings.length > 1 ? 's' : ''} trouve{listings.length > 1 ? 's' : ''}
+              </p>
+              {visibleListings.length > 0 ? (
+                <div className="mt-4 grid gap-6 sm:grid-cols-2">
+                  {visibleListings.map((item) => (
+                    <ListingCard
+                      key={item.id}
+                      item={item}
+                      isFavorite={favoriteIds.includes(item.id)}
+                      onToggleFavorite={toggleFavorite}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-6 rounded-2xl border border-gris-moyen/50 bg-blanc p-10 text-center text-gris-fonce">
+                  Aucun bien ne correspond a ces filtres.
+                </p>
+              )}
+            </>
           )}
 
           {/* Pagination */}
+          {totalPages > 1 && (
           <div className="mt-10 flex items-center justify-center gap-2">
             <button
               type="button"
@@ -388,7 +436,7 @@ export default function Annonces() {
             >
               ← Précédent
             </button>
-            {[1, 2, 3].map((p) => (
+            {Array.from({ length: totalPages }, (_, index) => index + 1).map((p) => (
               <button
                 key={p}
                 type="button"
@@ -404,12 +452,13 @@ export default function Annonces() {
             ))}
             <button
               type="button"
-              onClick={() => setPage((p) => p + 1)}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               className="rounded-full px-4 py-2 text-sm text-gris-fonce transition hover:text-noir"
             >
               Suivant →
             </button>
           </div>
+          )}
         </div>
       </div>
     </div>

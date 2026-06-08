@@ -1,8 +1,8 @@
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query, status
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
@@ -24,6 +24,7 @@ def _query_with_images():
 
 @router.get("", response_model=list[BienPublic])
 def list_biens(
+    q: str | None = None,
     ville: str | None = None,
     type: str | None = None,
     prix_min: float | None = None,
@@ -31,10 +32,24 @@ def list_biens(
     surface_min: int | None = None,
     surface_max: int | None = None,
     nb_pieces: int | None = None,
+    extras: list[str] = Query(default_factory=list),
+    tri: str = "recent",
     agence_id: int | None = None,
     db: Session = Depends(get_db),
 ) -> list[Bien]:
     stmt = _query_with_images().where(Bien.statut != "vendu")
+    if q:
+        like = f"%{q}%"
+        stmt = stmt.where(
+            or_(
+                Bien.titre.ilike(like),
+                Bien.description.ilike(like),
+                Bien.ville.ilike(like),
+                Bien.type_bien.ilike(like),
+                Bien.caracteristiques.ilike(like),
+                Bien.mots_cles.ilike(like),
+            )
+        )
     if ville:
         stmt = stmt.where(Bien.ville.ilike(f"%{ville}%"))
     if type:
@@ -49,9 +64,20 @@ def list_biens(
         stmt = stmt.where(Bien.surface <= surface_max)
     if nb_pieces is not None:
         stmt = stmt.where(Bien.nb_pieces >= nb_pieces)
+    for extra in extras:
+        like = f"%{extra}%"
+        stmt = stmt.where(or_(Bien.caracteristiques.ilike(like), Bien.mots_cles.ilike(like)))
     if agence_id is not None:
         stmt = stmt.where(Bien.id_agence == agence_id)
-    return list(db.scalars(stmt.order_by(Bien.date_ajout.desc())))
+    if tri == "prix_asc":
+        stmt = stmt.order_by(Bien.prix.asc())
+    elif tri == "prix_desc":
+        stmt = stmt.order_by(Bien.prix.desc())
+    elif tri == "surface_desc":
+        stmt = stmt.order_by(Bien.surface.desc())
+    else:
+        stmt = stmt.order_by(Bien.date_ajout.desc())
+    return list(db.scalars(stmt))
 
 
 @router.get("/{id_bien}", response_model=BienPublic)

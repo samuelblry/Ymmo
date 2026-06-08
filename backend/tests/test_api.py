@@ -19,6 +19,21 @@ def test_health_and_public_biens():
         assert "adresse" not in biens.json()[0]
 
 
+def test_public_biens_filters_and_sort():
+    with TestClient(app) as client:
+        filtered = client.get("/api/biens", params={"type": "Maison", "prix_max": 700000, "tri": "prix_asc"})
+        assert filtered.status_code == 200
+        data = filtered.json()
+        assert data
+        assert all(item["type_bien"] == "Maison" for item in data)
+        assert all(float(item["prix"]) <= 700000 for item in data)
+        assert [float(item["prix"]) for item in data] == sorted(float(item["prix"]) for item in data)
+
+        searched = client.get("/api/biens", params={"q": "Aix"})
+        assert searched.status_code == 200
+        assert searched.json()
+
+
 def test_client_login_and_contact_message():
     with TestClient(app) as client:
         login = client.post("/api/auth/login", json={"email": "client@ymmo.fr", "password": "Password123!"})
