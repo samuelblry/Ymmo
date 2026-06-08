@@ -1,0 +1,153 @@
+erDiagram
+    USER {
+        SERIAL id_user PK
+        VARCHAR nom
+        VARCHAR prenom
+        VARCHAR email UK
+        VARCHAR password_hash
+        VARCHAR telephone
+        TIMESTAMP date_inscription
+    }
+    EMPLOYES {
+        SERIAL id_employe PK
+        VARCHAR nom
+        VARCHAR prenom
+        VARCHAR email UK
+        VARCHAR password_hash
+        VARCHAR telephone
+        INT id_role FK
+        INT id_agence FK
+        BOOLEAN actif
+        VARCHAR mfa_secret
+        BOOLEAN mfa_enabled
+        VARCHAR reset_token
+        TIMESTAMP reset_token_expiry
+    }
+    ROLES {
+        SERIAL id_role PK
+        VARCHAR nom_role
+    }
+    AGENCES {
+        SERIAL id_agence PK
+        VARCHAR nom_agence
+        VARCHAR ville
+        VARCHAR code_postal
+        TEXT adresse
+        VARCHAR telephone
+        VARCHAR email
+        TEXT description
+        VARCHAR image_url
+    }
+    BIENS {
+        SERIAL id_bien PK
+        INT id_agence FK
+        INT id_commercial FK
+        VARCHAR titre
+        TEXT description
+        VARCHAR adresse
+        DECIMAL prix
+        INT surface
+        VARCHAR type_bien
+        VARCHAR ville
+        VARCHAR code_postal
+        VARCHAR statut
+        INT nb_pieces
+        INT nb_chambres
+        INT nb_sdb
+        TEXT caracteristiques
+        BOOLEAN terrain
+        INT surface_terrain
+        TEXT mots_cles
+        TIMESTAMP date_ajout
+        TIMESTAMP date_modification
+    }
+    IMAGES {
+        SERIAL id_image PK
+        VARCHAR url
+        INT id_bien FK
+        BOOLEAN is_main
+    }
+    ARTICLES {
+        SERIAL id_article PK
+        INT id_auteur FK
+        VARCHAR titre
+        TEXT contenu
+        VARCHAR image_url
+        VARCHAR statut
+        TIMESTAMP date_envoi
+    }
+    MESSAGES {
+        SERIAL id_message PK
+        INT id_agence_dest FK
+        VARCHAR nom
+        VARCHAR prenom
+        VARCHAR email
+        VARCHAR telephone
+        VARCHAR sujet
+        TEXT contenu
+        BOOLEAN lu
+        TIMESTAMP date_envoi
+    }
+    STATS_BIENS {
+        SERIAL id_stat PK
+        INT id_bien FK
+        INT nb_vues
+        INT nb_clicks
+        INT nb_likes
+        FLOAT score_popularite
+        TIMESTAMP last_update
+    }
+    STATS_ARTICLES {
+        SERIAL id_stat PK
+        INT id_article FK
+        INT nb_vues
+        INT nb_likes
+        FLOAT score_popularite
+        TIMESTAMP last_update
+    }
+    FAVORIS_BIENS {
+        SERIAL id_favori PK
+        INT id_user FK
+        INT id_bien FK
+        TIMESTAMP date_ajout
+    }
+    FAVORIS_ARTICLES {
+        SERIAL id_favori PK
+        INT id_user FK
+        INT id_article FK
+        TIMESTAMP date_ajout
+    }
+    LIKES {
+        SERIAL id_like PK
+        INT id_user FK
+        INT id_bien FK
+        INT id_article FK
+        TIMESTAMP date_ajout
+    }
+    LOGS {
+        SERIAL id_log PK
+        INT id_employe FK
+        VARCHAR action
+        VARCHAR ip_adresse
+        TEXT user_agent
+        BOOLEAN succes
+        TIMESTAMP date_heure
+    }
+
+    ROLES   ||--o{ EMPLOYES        : "définit"
+    AGENCES ||--o{ EMPLOYES        : "emploie"
+    AGENCES ||--o{ BIENS           : "gère"
+    EMPLOYES ||--o{ BIENS          : "publie (commercial)"
+    BIENS   ||--o{ IMAGES          : "possède"
+    EMPLOYES ||--o{ ARTICLES       : "rédige"
+    AGENCES ||--o{ MESSAGES        : "reçoit"
+    BIENS   ||--|| STATS_BIENS     : "mesuré par"
+    ARTICLES ||--|| STATS_ARTICLES : "mesuré par"
+    USER    ||--o{ FAVORIS_BIENS   : "ajoute"
+    BIENS   ||--o{ FAVORIS_BIENS   : "favori de"
+    USER    ||--o{ FAVORIS_ARTICLES: "ajoute"
+    ARTICLES ||--o{ FAVORIS_ARTICLES: "favori de"
+    USER    ||--o{ LIKES           : "aime"
+    BIENS   ||--o{ LIKES           : "liké"
+    ARTICLES ||--o{ LIKES          : "liké"
+    EMPLOYES ||--o{ LOGS           : "génère"

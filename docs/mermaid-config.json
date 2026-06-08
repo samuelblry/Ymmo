@@ -1,0 +1,15 @@
+{
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Inter, sans-serif",
+    "primaryColor": "#EFE7DD",
+    "primaryTextColor": "#18181B",
+    "primaryBorderColor": "#A88B6A",
+    "lineColor": "#5A3614",
+    "tertiaryColor": "#F5F5F4"
+  },
+  "er": {
+    "useMaxWidth": false,
+    "entityPadding": 12
+  }
+}
